@@ -22,12 +22,13 @@ A personal notes app with collections, tags and search. It runs locally with `np
 
 ## Data access
 - Every database table read and write goes through ONE helper module: `lib/db.ts`. Components and pages never query tables with Supabase directly.
-- `lib/db.ts` currently has `isSignedIn()` and `getNotes()`. It is used by `app/notes/page.tsx`.
+- `lib/db.ts` currently has `getNotes()`, `getNote(id)`, `createNote()`, `updateNote(id, { title, body })`, `deleteNote(id)` and `deleteNoteIfNeverSaved(id)`. Each returns `{ data, error }`.
+- Client Components change data through Server Actions (e.g. `app/notes/actions.ts`), which call `lib/db.ts`.
 - `lib/db.ts` is server-only: it uses the server Supabase client and request cookies. Import it only from Server Components, Server Actions (`"use server"` files) and Route Handlers, never from a `"use client"` component.
 - Auth is not in `lib/db.ts` yet. These files still call Supabase auth directly, through the clients in `lib/supabase/`:
   - Client Components: `login-form`, `sign-up-form`, `forgot-password-form`, `update-password-form`, `logout-button` (in `components/`)
   - Server code: `components/auth-button.tsx`, `app/protected/page.tsx`, `app/auth/confirm/route.ts`
-  - `proxy.ts` (via `lib/supabase/proxy.ts`) refreshes the session on each request
+  - `proxy.ts` (via `lib/supabase/proxy.ts`) refreshes the session on each request, and sends logged-out visitors to the login page except on `/`, `/auth/*` and `/notes` (open for now, no login needed)
   Leave them as they are unless a task is about auth.
 
 ## Workflow
