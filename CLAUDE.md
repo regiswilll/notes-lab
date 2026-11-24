@@ -1,0 +1,38 @@
+@AGENTS.md
+
+# notes-lab
+
+## What the app is
+A personal notes app with collections, tags and search. It runs locally with `npm run dev`.
+
+## Stack
+- Next.js App Router
+- TypeScript
+- Tailwind CSS
+- Supabase via the `supabase-js` client
+
+## Database work
+- Do NOT use the Supabase MCP server. Use the Supabase CLI (`npx supabase`) for all database work.
+- Tables: `notes`, `collections`, `tags`, `note_tags`. The schema is described in `docs/supabase-schema.md`.
+- Every schema change goes in a migration file (`npx supabase migration new <name>`), never edited directly in the Supabase dashboard.
+
+## Credentials
+- Credentials come only from `.env.local`: `NEXT_PUBLIC_SUPABASE_URL` and the publishable/anon key.
+- Never hard-code them.
+
+## Data access
+- Every database table read and write goes through ONE helper module: `lib/db.ts`. Components and pages never query tables with Supabase directly.
+- `lib/db.ts` currently has `isSignedIn()` and `getNotes()`. It is used by `app/notes/page.tsx`.
+- `lib/db.ts` is server-only: it uses the server Supabase client and request cookies. Import it only from Server Components, Server Actions (`"use server"` files) and Route Handlers, never from a `"use client"` component.
+- Auth is not in `lib/db.ts` yet. These files still call Supabase auth directly, through the clients in `lib/supabase/`:
+  - Client Components: `login-form`, `sign-up-form`, `forgot-password-form`, `update-password-form`, `logout-button` (in `components/`)
+  - Server code: `components/auth-button.tsx`, `app/protected/page.tsx`, `app/auth/confirm/route.ts`
+  - `proxy.ts` (via `lib/supabase/proxy.ts`) refreshes the session on each request
+  Leave them as they are unless a task is about auth.
+
+## Workflow
+- Build one feature at a time, on its own git branch.
+- Do not add new libraries without asking first.
+
+## UI
+- Whenever a list is empty, show a friendly message instead of a blank screen.

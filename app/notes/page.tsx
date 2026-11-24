@@ -1,29 +1,22 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { createClient } from "@/lib/supabase/server";
+import { getNotes, isSignedIn } from "@/lib/db";
 
 async function NotesList() {
-  const supabase = await createClient();
-
   // The notes table only lets signed-in users read it, so send everyone else to log in.
-  const { data: auth } = await supabase.auth.getClaims();
-  if (!auth?.claims) {
+  if (!(await isSignedIn())) {
     redirect("/auth/login");
   }
 
-  const { data: notes, error } = await supabase
-    .from("notes")
-    .select("id, title, body")
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false });
+  const { data: notes, error } = await getNotes();
 
-  if (error) {
-    return <p>Could not load notes: {error.message}</p>;
+  if (error !== null) {
+    return <p>Could not load notes: {error}</p>;
   }
 
   if (!notes.length) {
-    return <p>No notes yet.</p>;
+    return <p>No notes yet. Create your first note to see it here.</p>;
   }
 
   return (
