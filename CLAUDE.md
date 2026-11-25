@@ -36,9 +36,42 @@ A personal notes app with collections, tags and search. It runs locally with `np
   - `proxy.ts` (via `lib/supabase/proxy.ts`) refreshes the session on each request, and sends logged-out visitors to the login page except on `/`, `/auth/*` and `/notes` (open for now, no login needed)
   Leave them as they are unless a task is about auth.
 
+## Notes page (`app/notes/`)
+- `page.tsx` is a Server Component: it reads the URL, loads data through `lib/db.ts` and renders the sidebar and the main area. Client pieces live in `app/notes/_components/`; data changes go through `app/notes/actions.ts`.
+- `cacheComponents` is on (`next.config.ts`): request-time data (URL search params, cookies, database reads) is read inside `<Suspense>`.
+- Page state lives in the URL, so a reload keeps it:
+  - `?id=5`: the open note
+  - `?saved=5`: the "saved" message
+  - `?tags=1,3`: the tag filter
+  - `?q=text`: the search
+  - `?view=tags`: the tags list
+- Build these URLs with `notesHref()` from `app/notes/list-state.ts`. Forms send the tag filter and search as hidden fields (`ListStateFields`), so Server Action redirects keep them.
+- Sidebar layout, top to bottom:
+  - The search box
+  - The New note, New collection and Tags buttons
+  - The tag filter
+  - The notes, grouped by collection, then "Uncollected"
+- Small screens (below the `md` breakpoint): the tags list and an open note's editor appear just below the Tags button, above the notes. Wide screens: they appear in the main area on the right.
+
+## Behaviour to keep
+- **New notes:**
+  - "New note" creates a note with a blank title straight away.
+  - Saving requires a title.
+  - Cancel on a never-saved note deletes it.
+- **Saving:** Save stores the title, body, collection and tags together; the tags are written after the note, in a separate step.
+- **Tag filter:** shows only notes that have ALL the selected tags, not any of them.
+- **Search:** matches title OR body, not case-sensitive, and only within the tag filter. User text is matched literally (`%`, `_`, `*`, quotes, commas).
+- **Tag names:** unique ignoring upper/lower case, so typing "work" reuses "Work". New tags are only created when a note is saved.
+- **Deleting:**
+  - Deleting a collection moves its notes to "Uncollected".
+  - Deleting a tag removes it from its notes.
+  - Neither deletes notes.
+- **Length limits:** collection name 100 characters, tag name 50, 20 tags per note, search 100.
+
 ## Workflow
 - Build one feature at a time, on its own git branch.
 - Do not add new libraries without asking first.
+- Before committing, run `npx tsc --noEmit -p .` and `npx eslint app lib`. There is no automated test suite yet; check changes in the browser with `npm run dev`.
 
 ## UI
 - No screen is ever blank: every empty list, empty collection, search or filter with no results, and loading state shows a friendly message.
