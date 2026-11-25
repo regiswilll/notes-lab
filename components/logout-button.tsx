@@ -11,7 +11,9 @@ export function LogoutButton() {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/auth/login");
+    // Drop any cached signed-in pages so Back can't show them.
+    router.refresh();
   };
 
-  return <Button onClick={logout}>Logout</Button>;
+  return <Button onClick={logout}>Sign out</Button>;
 }
