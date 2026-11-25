@@ -4,6 +4,12 @@
 // Supabase client, so never import it from a "use client" component.
 import { createClient } from "@/lib/supabase/server";
 
+/** A tag. Names are unique; the app also treats "Work" and "work" as the same tag. */
+export type Tag = {
+  id: number;
+  name: string;
+};
+
 /** What the sidebar needs for each note. */
 export type NoteSummary = {
   id: number;
@@ -11,6 +17,8 @@ export type NoteSummary = {
   updated_at: string;
   /** The collection this note is in, or null for no collection. */
   collection_id: number | null;
+  /** The note's tags, sorted by name. */
+  tags: Tag[];
 };
 
 /** A collection: a named group that holds notes. */
@@ -27,19 +35,55 @@ export type Note = NoteSummary & {
 
 export type Result<T> = { data: T; error: null } | { data: null; error: string };
 
-/** All notes, most recently updated first. */
-export async function getNotes(): Promise<Result<NoteSummary[]>> {
+/**
+ * Notes, most recently updated first, each with its tags.
+ * With tagIds, only notes that have EVERY one of those tags are returned
+ * (not notes that have any of them).
+ */
+export async function getNotes(tagIds: number[] = []): Promise<Result<NoteSummary[]>> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+
+  let onlyIds: number[] | null = null;
+  if (tagIds.length > 0) {
+    const wanted = [...new Set(tagIds)];
+    const { data: links, error } = await supabase
+      .from("note_tags")
+      .select("note_id, tag_id")
+      .in("tag_id", wanted);
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+    // note_tags has one row per note-tag pair (its primary key), so a note
+    // that has all the wanted tags appears exactly wanted.length times.
+    const hits = new Map<number, number>();
+    for (const link of links) {
+      hits.set(link.note_id, (hits.get(link.note_id) ?? 0) + 1);
+    }
+    onlyIds = [...hits].filter(([, n]) => n === wanted.length).map(([id]) => id);
+    if (onlyIds.length === 0) {
+      return { data: [], error: null };
+    }
+  }
+
+  // tags (id, name): PostgREST follows the note_tags join table to tags.
+  let query = supabase
     .from("notes")
-    .select("id, title, updated_at, collection_id")
+    .select("id, title, updated_at, collection_id, tags (id, name)");
+  if (onlyIds !== null) {
+    query = query.in("id", onlyIds);
+  }
+  const { data, error } = await query
     .order("updated_at", { ascending: false })
     .order("id", { ascending: false });
 
   if (error) {
     return { data: null, error: error.message };
   }
-  return { data, error: null };
+  return {
+    data: data.map((note) => ({ ...note, tags: sortTags(note.tags ?? []) })),
+    error: null,
+  };
 }
 
 /** One note by id, or null if there is no note with that id. */
@@ -47,14 +91,17 @@ export async function getNote(id: number): Promise<Result<Note | null>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("notes")
-    .select("id, title, body, collection_id, created_at, updated_at")
+    .select("id, title, body, collection_id, created_at, updated_at, tags (id, name)")
     .eq("id", id)
     .maybeSingle();
 
   if (error) {
     return { data: null, error: error.message };
   }
-  return { data, error: null };
+  return {
+    data: data && { ...data, tags: sortTags(data.tags ?? []) },
+    error: null,
+  };
 }
 
 /**
@@ -199,4 +246,147 @@ export async function deleteCollection(id: number): Promise<Result<null>> {
     return { data: null, error: error.message };
   }
   return { data: null, error: null };
+}
+
+/** A tag with the number of notes it is on (for the tags list). */
+export type TagWithCount = Tag & { noteCount: number };
+
+/** All tags, sorted by name, each with how many notes have it. */
+export async function getTags(): Promise<Result<TagWithCount[]>> {
+  const supabase = await createClient();
+  // note_tags(count): the number of note_tags rows for each tag.
+  const { data, error } = await supabase
+    .from("tags")
+    .select("id, name, note_tags(count)")
+    .order("name", { ascending: true });
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  const tags = data.map((tag) => ({
+    id: tag.id as number,
+    name: tag.name as string,
+    noteCount: (tag.note_tags as { count: number }[] | null)?.[0]?.count ?? 0,
+  }));
+  return { data: sortTags(tags), error: null };
+}
+
+/**
+ * Renames a tag. Refuses a name another tag already has, ignoring upper/lower
+ * case (the app treats "Work" and "work" as the same tag).
+ */
+export async function renameTag(id: number, name: string): Promise<Result<null>> {
+  const supabase = await createClient();
+  const { data: existing, error: readError } = await supabase.from("tags").select("id, name");
+  if (readError) {
+    return { data: null, error: readError.message };
+  }
+  const clash = existing.find((tag) => tag.id !== id && tag.name.toLowerCase() === name.toLowerCase());
+  if (clash) {
+    return { data: null, error: `There is already a tag called "${clash.name}".` };
+  }
+
+  const { data, error } = await supabase
+    .from("tags")
+    .update({ name })
+    .eq("id", id)
+    .select("id");
+
+  if (error) {
+    // 23505 = unique violation: another tag got this name at the same moment.
+    return {
+      data: null,
+      error: error.code === "23505" ? `There is already a tag called "${name}".` : error.message,
+    };
+  }
+  if (data.length === 0) {
+    return { data: null, error: "This tag no longer exists." };
+  }
+  return { data: null, error: null };
+}
+
+/**
+ * Deletes a tag. The database also removes it from every note
+ * (note_tags rows go with it: ON DELETE CASCADE). The notes themselves stay.
+ */
+export async function deleteTag(id: number): Promise<Result<null>> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("tags").delete().eq("id", id);
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data: null, error: null };
+}
+
+/**
+ * Makes a note's tags exactly the given names:
+ * 1. each name reuses an existing tag (ignoring upper/lower case) or creates it;
+ * 2. note_tags rows are added for new pairs and removed for dropped ones.
+ * Tags that end up on no note are kept, so they can be reused.
+ */
+export async function setNoteTags(noteId: number, names: string[]): Promise<Result<null>> {
+  const supabase = await createClient();
+
+  // Drop duplicates that differ only in case ("Work", "work").
+  const wanted = new Map<string, string>();
+  for (const name of names) {
+    if (!wanted.has(name.toLowerCase())) wanted.set(name.toLowerCase(), name);
+  }
+
+  // 1. Find or create the tags.
+  const { data: existing, error: readError } = await supabase.from("tags").select("id, name");
+  if (readError) {
+    return { data: null, error: readError.message };
+  }
+  const byName = new Map(existing.map((tag) => [tag.name.toLowerCase(), tag.id]));
+  const missing = [...wanted].filter(([key]) => !byName.has(key)).map(([, name]) => ({ name }));
+  if (missing.length > 0) {
+    const { data: created, error } = await supabase.from("tags").insert(missing).select("id, name");
+    if (error) {
+      // 23505 = unique violation: the same tag was created at the same moment.
+      return {
+        data: null,
+        error: error.code === "23505" ? "A tag was just created elsewhere; please save again." : error.message,
+      };
+    }
+    for (const tag of created) byName.set(tag.name.toLowerCase(), tag.id);
+  }
+  const tagIds = [...wanted.keys()].map((key) => byName.get(key)!);
+
+  // 2. Link and unlink.
+  const { data: links, error: linkError } = await supabase
+    .from("note_tags")
+    .select("tag_id")
+    .eq("note_id", noteId);
+  if (linkError) {
+    return { data: null, error: linkError.message };
+  }
+  const current = new Set(links.map((link) => link.tag_id as number));
+  const toRemove = [...current].filter((id) => !tagIds.includes(id));
+  const toAdd = tagIds.filter((id) => !current.has(id));
+
+  if (toRemove.length > 0) {
+    const { error } = await supabase
+      .from("note_tags")
+      .delete()
+      .eq("note_id", noteId)
+      .in("tag_id", toRemove);
+    if (error) {
+      return { data: null, error: error.message };
+    }
+  }
+  if (toAdd.length > 0) {
+    const { error } = await supabase
+      .from("note_tags")
+      .insert(toAdd.map((tag_id) => ({ note_id: noteId, tag_id })));
+    if (error) {
+      return { data: null, error: error.message };
+    }
+  }
+  return { data: null, error: null };
+}
+
+function sortTags<T extends Tag>(tags: T[]): T[] {
+  return [...tags].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }

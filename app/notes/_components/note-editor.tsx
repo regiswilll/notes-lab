@@ -5,8 +5,9 @@ import { startTransition, useActionState, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { Collection, Note } from "@/lib/db";
+import type { Collection, Note, Tag } from "@/lib/db";
 import { CollectionPicker } from "./collection-picker";
+import { TagEditor } from "./tag-editor";
 import {
   deleteNoteAction,
   discardNewNoteAction,
@@ -19,11 +20,17 @@ const initialState: ActionState = { status: "idle" };
 export function NoteEditor({
   note,
   collections,
+  allTags,
+  filter,
   lastSavedLabel,
 }: {
   note: Note;
   /** For the collection dropdown. */
   collections: Collection[];
+  /** Every tag, for suggestions in the tag box. */
+  allTags: Tag[];
+  /** The sidebar's tag filter ("1,3" or ""), kept when the editor closes. */
+  filter: string;
   /** note.updated_at, already formatted on the server. */
   lastSavedLabel: string;
 }) {
@@ -35,6 +42,9 @@ export function NoteEditor({
   const selectedCollection = collections.some((c) => c.id === collectionId)
     ? collectionId
     : null;
+  const [tags, setTags] = useState(() => note.tags.map((t) => t.name));
+  // Text typed in the tag box but not yet added as a chip.
+  const [tagDraft, setTagDraft] = useState("");
 
   const [saveState, saveAction, saving] = useActionState(
     saveNoteAction,
@@ -53,11 +63,14 @@ export function NoteEditor({
   // (saving requires a title), so it counts as a new note.
   const isNew = note.title.trim() === "";
 
-  // Compare against the version loaded from the database.
+  // Compare against the version loaded from the database. Rule: ANY change in
+  // the editor (including text typed in the tag box) enables Save.
   const dirty =
+    tagDraft.trim() !== "" ||
     title !== note.title ||
     body !== (note.body ?? "") ||
-    selectedCollection !== note.collection_id;
+    selectedCollection !== note.collection_id ||
+    tagKey(tags) !== tagKey(note.tags.map((t) => t.name));
 
   // Warn before closing or reloading the tab with unsaved changes.
   useEffect(() => {
@@ -75,11 +88,12 @@ export function NoteEditor({
       if (dirty && !window.confirm("Discard this new note?")) return;
       const formData = new FormData();
       formData.set("id", String(note.id));
+      formData.set("filter", filter);
       startTransition(() => discardAction(formData));
       return;
     }
     if (dirty && !window.confirm("Discard your unsaved changes?")) return;
-    router.push("/notes");
+    router.push(filter ? `/notes?tags=${filter}` : "/notes");
   }
 
   let status: { text: string; tone: "muted" | "error" } | null = null;
@@ -94,6 +108,7 @@ export function NoteEditor({
     <div className="flex min-h-0 flex-1 flex-col">
       <form action={saveAction} className="flex min-h-0 flex-1 flex-col gap-4">
         <input type="hidden" name="id" value={note.id} />
+        <input type="hidden" name="filter" value={filter} />
 
         <div className="flex flex-wrap items-center gap-3">
           <Input
@@ -119,6 +134,15 @@ export function NoteEditor({
           value={selectedCollection}
           onChange={setCollectionId}
           collections={collections}
+        />
+
+        <TagEditor
+          noteId={note.id}
+          value={tags}
+          onChange={setTags}
+          draft={tagDraft}
+          onDraftChange={setTagDraft}
+          allTags={allTags}
         />
 
         <textarea
@@ -153,6 +177,7 @@ export function NoteEditor({
         >
           <input type="hidden" name="id" value={note.id} />
           <input type="hidden" name="openId" value={note.id} />
+          <input type="hidden" name="filter" value={filter} />
           {deleteState.status === "error" && (
             <span role="alert" className="text-destructive">
               {deleteState.message}
@@ -171,4 +196,9 @@ export function NoteEditor({
 /** "My note" in quotes, or "this note" when the title is blank. */
 function quoted(title: string) {
   return title.trim() ? `"${title}"` : "this note";
+}
+
+/** Tag names compared ignoring order and upper/lower case. */
+function tagKey(names: string[]) {
+  return names.map((n) => n.toLowerCase()).sort().join("\n");
 }

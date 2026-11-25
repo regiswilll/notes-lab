@@ -11,7 +11,10 @@ import {
   deleteNote,
   deleteCollection,
   deleteNoteIfNeverSaved,
+  deleteTag,
   renameCollection,
+  renameTag,
+  setNoteTags,
   updateNote,
 } from "@/lib/db";
 
@@ -30,6 +33,27 @@ function isId(value: unknown): value is number {
 }
 
 const MAX_COLLECTION_NAME = 100;
+const MAX_TAG_NAME = 50;
+const MAX_TAGS_PER_NOTE = 20;
+
+/**
+ * The sidebar's tag filter ("1,3"), sent along by forms as "filter" so a
+ * redirect keeps it. Anything that isn't a list of ids is dropped.
+ */
+function readFilter(formData: FormData): string {
+  const filter = String(formData.get("filter") ?? "");
+  return /^\d+(,\d+)*$/.test(filter) ? filter : "";
+}
+
+/** /notes with the given query values (empty ones left out). */
+function notesUrl(params: { id?: number; saved?: number; filter: string }): string {
+  const query = new URLSearchParams();
+  if (params.id) query.set("id", String(params.id));
+  if (params.saved) query.set("saved", String(params.saved));
+  if (params.filter) query.set("tags", params.filter);
+  const text = query.toString().replaceAll("%2C", ",");
+  return text ? `/notes?${text}` : "/notes";
+}
 
 /** Trimmed collection name, or an error message if it can't be used. */
 function readCollectionName(formData: FormData): { name: string } | { error: string } {
@@ -41,12 +65,15 @@ function readCollectionName(formData: FormData): { name: string } | { error: str
   return { name };
 }
 
-export async function createNoteAction(): Promise<ActionState> {
+export async function createNoteAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const result = await createNote();
   if (result.error !== null) {
     return { status: "error", message: `Could not create a note: ${result.error}` };
   }
-  redirect(`/notes?id=${result.data.id}`);
+  redirect(notesUrl({ id: result.data.id, filter: readFilter(formData) }));
 }
 
 export async function saveNoteAction(
@@ -72,13 +99,30 @@ export async function saveNoteAction(
     return { status: "error", message: "That is not a valid collection." };
   }
 
+  // Tag chips in the editor are sent as one "tag" field each.
+  const tags = formData
+    .getAll("tag")
+    .map((value) => String(value).trim())
+    .filter((name) => name !== "");
+  if (tags.some((name) => name.length > MAX_TAG_NAME)) {
+    return { status: "error", message: `Keep each tag to ${MAX_TAG_NAME} characters or fewer.` };
+  }
+  if (tags.length > MAX_TAGS_PER_NOTE) {
+    return { status: "error", message: `A note can have at most ${MAX_TAGS_PER_NOTE} tags.` };
+  }
+
   const result = await updateNote(id, { title, body, collection_id });
   if (result.error !== null) {
     return { status: "error", message: `Could not save: ${result.error}` };
   }
+  const tagResult = await setNoteTags(id, tags);
+  if (tagResult.error !== null) {
+    refresh(); // the title/body/collection did save; show that
+    return { status: "error", message: `Saved, but the tags could not be saved: ${tagResult.error}` };
+  }
 
   // Close the editor: go back to the list, with a "saved" confirmation.
-  redirect(`/notes?saved=${id}`);
+  redirect(notesUrl({ saved: id, filter: readFilter(formData) }));
 }
 
 export async function deleteNoteAction(
@@ -99,7 +143,7 @@ export async function deleteNoteAction(
   // the editor; deleting any other note keeps the editor and its unsaved text.
   const openId = Number(formData.get("openId"));
   if (openId === id) {
-    redirect("/notes");
+    redirect(notesUrl({ filter: readFilter(formData) }));
   }
   refresh();
   return { status: "idle" };
@@ -119,7 +163,7 @@ export async function discardNewNoteAction(
   if (result.error !== null) {
     return { status: "error", message: `Could not discard the new note: ${result.error}` };
   }
-  redirect("/notes");
+  redirect(notesUrl({ filter: readFilter(formData) }));
 }
 
 /** "New collection" in the sidebar: adds a collection with the given name. */
@@ -175,6 +219,49 @@ export async function deleteCollectionAction(
   const result = await deleteCollection(id);
   if (result.error !== null) {
     return { status: "error", message: `Could not delete the collection: ${result.error}` };
+  }
+  refresh();
+  return { status: "success" };
+}
+
+/** Enter in the tags list's edit box: renames the tag everywhere it is used. */
+export async function renameTagAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const id = readId(formData);
+  if (id === null) {
+    return { status: "error", message: "This tag has no valid id." };
+  }
+  const name = String(formData.get("name") ?? "").trim();
+  if (name === "") {
+    return { status: "error", message: "Give the tag a name." };
+  }
+  if (name.length > MAX_TAG_NAME) {
+    return { status: "error", message: `Keep a tag to ${MAX_TAG_NAME} characters or fewer.` };
+  }
+
+  const result = await renameTag(id, name);
+  if (result.error !== null) {
+    return { status: "error", message: `Could not rename the tag: ${result.error}` };
+  }
+  refresh();
+  return { status: "success" };
+}
+
+/** Delete in the tags list: removes the tag from every note, then deletes it. */
+export async function deleteTagAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const id = readId(formData);
+  if (id === null) {
+    return { status: "error", message: "This tag has no valid id." };
+  }
+
+  const result = await deleteTag(id);
+  if (result.error !== null) {
+    return { status: "error", message: `Could not delete the tag: ${result.error}` };
   }
   refresh();
   return { status: "success" };
