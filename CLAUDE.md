@@ -23,7 +23,7 @@ A personal notes app with collections, tags and search. It runs locally with `np
 ## Data access
 - Every database table read and write goes through ONE helper module: `lib/db.ts`. Components and pages never query tables with Supabase directly.
 - `lib/db.ts` currently has:
-  - Notes: `getNotes(tagIds?)` (only notes with ALL the given tags), `getNote(id)`, `createNote()`, `updateNote(id, { title, body, collection_id })`, `deleteNote(id)` and `deleteNoteIfNeverSaved(id)`
+  - Notes: `getNotes({ tagIds, search })` (only notes with ALL the given tags; `search` matches title OR body, not case-sensitive), `getNote(id)`, `createNote()`, `updateNote(id, { title, body, collection_id })`, `deleteNote(id)` and `deleteNoteIfNeverSaved(id)`
   - Collections: `getCollections()`, `createCollection(name)`, `renameCollection(id, name)` and `deleteCollection(id)`
   - Tags: `getTags()` (with each tag's note count), `setNoteTags(noteId, names)` (reuses or creates tags, then links/unlinks them in `note_tags`), `renameTag(id, name)` and `deleteTag(id)`
 
@@ -41,5 +41,5 @@ A personal notes app with collections, tags and search. It runs locally with `np
 - Do not add new libraries without asking first.
 
 ## UI
-- Whenever a list is empty, show a friendly message instead of a blank screen.
+- No screen is ever blank: every empty list, empty collection, search or filter with no results, and loading state shows a friendly message.
 - Note editor: ANY change in the editor (title, body, collection, tags, even text typed in the tag box) must enable the Save button, and Save must store it. Cancel discards it. Keep this for every field added later.

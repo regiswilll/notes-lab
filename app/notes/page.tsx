@@ -18,14 +18,16 @@ import { NewCollectionButton } from "./_components/new-collection-button";
 import { NewNoteButton } from "./_components/new-note-button";
 import { NoteEditor } from "./_components/note-editor";
 import { NoteGroup } from "./_components/note-group";
+import { SearchBox } from "./_components/search-box";
 import { TagManager } from "./_components/tag-manager";
+import { notesHref, parseSearch, parseTagIds, type ListState } from "./list-state";
 
 export const metadata: Metadata = { title: "Notes" };
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
-// The selected note, the tag filter and the tags list live in the URL
-// (/notes?id=5&tags=1,3, /notes?view=tags), so a reload keeps them.
+// The selected note, the tag filter, the search and the tags list live in the
+// URL (/notes?id=5&tags=1,3&q=plan, /notes?view=tags), so a reload keeps them.
 // With Cache Components, the URL and the database are request-time data, so
 // they are read inside <Suspense> below rather than in the page itself.
 export default function NotesPage({ searchParams }: { searchParams: SearchParams }) {
@@ -33,7 +35,11 @@ export default function NotesPage({ searchParams }: { searchParams: SearchParams
     // Narrow screens: sidebar on top, whole page scrolls (no height cap, so no
     // note is hidden). From md up: side-by-side, each column scrolls on its own.
     <div className="flex min-h-dvh flex-col md:h-dvh md:flex-row">
-      <Suspense fallback={<Shell sidebar={<Muted>Loading notes…</Muted>} main={null} />}>
+      <Suspense
+        fallback={
+          <Shell sidebar={<Muted>Loading notes…</Muted>} main={<Centered>Loading…</Centered>} />
+        }
+      >
         <NotesWorkspace searchParams={searchParams} />
       </Suspense>
     </div>
@@ -53,18 +59,43 @@ async function NotesWorkspace({ searchParams }: { searchParams: SearchParams }) 
     selectedId === null ? null : getNote(selectedId),
   ]);
   // Tags picked in the filter; ids of tags that no longer exist are ignored.
-  const filterIds = parseIdList(params.tags).filter((id) =>
+  const filterIds = parseTagIds(params.tags).filter((id) =>
     tags.data?.some((tag) => tag.id === id),
   );
-  const filter = filterIds.join(",");
-  const list = await getNotes(filterIds);
+  const search = parseSearch(params.q);
+  const listState: ListState = { tags: filterIds, q: search };
+  // Search runs inside the tag filter: notes with all selected tags AND the text.
+  const list = await getNotes({ tagIds: filterIds, search });
+  const narrowed = filterIds.length > 0 || search !== "";
 
   const saved = savedId === null ? null : savedTitle(list.data, savedId);
 
+  const pickNote = (
+    <p>
+      {list.data?.length
+        ? "Pick a note from the list, or create a new one."
+        : narrowed
+          ? "Change or clear the search or tag filter to see more notes."
+          : "Your notes will appear here. Create one to get started."}
+    </p>
+  );
+  const tagList = (headingId: string) =>
+    tags.error !== null ? (
+      <ErrorText>Could not load tags: {tags.error}</ErrorText>
+    ) : (
+      <TagManager tags={tags.data} closeHref={notesHref(listState)} headingId={headingId} />
+    );
+
   return (
     <Shell
-      filterIds={filterIds}
+      listState={listState}
+      openId={selectedId}
       showTags={showTags}
+      // Small screens: the tags list goes just below the Tags button, above
+      // the notes (the main area is below all the notes there).
+      tagsBelowButton={showTags ? tagList("tags-heading-small") : null}
+      // Small screens: an open note's editor goes above the notes too.
+      editorOpen={!showTags && selected !== null}
       sidebar={
         <div className="space-y-3">
           {tags.error !== null ? (
@@ -72,7 +103,7 @@ async function NotesWorkspace({ searchParams }: { searchParams: SearchParams }) 
           ) : (
             <TagFilter
               tags={tags.data}
-              selectedIds={filterIds}
+              listState={listState}
               openId={selectedId}
               view={showTags ? "tags" : undefined}
             />
@@ -81,6 +112,15 @@ async function NotesWorkspace({ searchParams }: { searchParams: SearchParams }) 
             <ErrorText>Could not load notes: {list.error}</ErrorText>
           ) : collections.error !== null ? (
             <ErrorText>Could not load collections: {collections.error}</ErrorText>
+          ) : search !== "" && list.data.length === 0 ? (
+            <Muted>
+              No notes match your search.
+              {filterIds.length > 0 && (
+                <span className="mt-1 block text-xs">
+                  Only notes with all the selected tags are searched.
+                </span>
+              )}
+            </Muted>
           ) : filterIds.length > 0 && list.data.length === 0 ? (
             <Muted>No notes have all of these tags.</Muted>
           ) : list.data.length === 0 && collections.data.length === 0 ? (
@@ -90,20 +130,21 @@ async function NotesWorkspace({ searchParams }: { searchParams: SearchParams }) 
               notes={list.data}
               collections={collections.data}
               selectedId={selectedId}
-              filterIds={filterIds}
+              listState={listState}
             />
           )}
         </div>
       }
       main={
         showTags ? (
-          tags.error !== null ? (
-            <Centered>
-              <ErrorText>Could not load tags: {tags.error}</ErrorText>
-            </Centered>
-          ) : (
-            <TagManager tags={tags.data} closeHref={notesHref(null, filterIds)} />
-          )
+          <>
+            {/* Wide screens: the tags list on the right, as before. */}
+            <div className="hidden md:flex md:flex-1 md:flex-col">{tagList("tags-heading")}</div>
+            {/* Small screens: the list is in the sidebar, so show the usual message here. */}
+            <div className="flex flex-1 flex-col md:hidden">
+              <Centered>{pickNote}</Centered>
+            </div>
+          </>
         ) : selected === null ? (
           <Centered>
             {saved && (
@@ -111,18 +152,12 @@ async function NotesWorkspace({ searchParams }: { searchParams: SearchParams }) 
                 “{saved}” saved.
               </p>
             )}
-            {savedId !== null && !saved && filterIds.length > 0 && (
+            {savedId !== null && !saved && narrowed && (
               <p role="status" className="mb-2 font-medium text-foreground">
-                Note saved. It doesn’t have all the selected tags, so the filter hides it.
+                Note saved. It doesn’t match the current search or tag filter, so it’s hidden.
               </p>
             )}
-            <p>
-              {list.data?.length
-                ? "Pick a note from the list, or create a new one."
-                : filterIds.length > 0
-                  ? "Change or clear the tag filter to see more notes."
-                  : "Your notes will appear here. Create one to get started."}
-            </p>
+            {pickNote}
           </Centered>
         ) : selected.error !== null ? (
           <Centered>
@@ -139,7 +174,7 @@ async function NotesWorkspace({ searchParams }: { searchParams: SearchParams }) 
             note={selected.data}
             collections={collections.data ?? []}
             allTags={tags.data ?? []}
-            filter={filter}
+            listState={listState}
             lastSavedLabel={formatDate(selected.data.updated_at)}
           />
         )
@@ -148,38 +183,75 @@ async function NotesWorkspace({ searchParams }: { searchParams: SearchParams }) 
   );
 }
 
+const noFilter: ListState = { tags: [], q: "" };
+
 function Shell({
   sidebar,
   main,
-  filterIds = [],
+  listState,
+  openId = null,
   showTags = false,
+  tagsBelowButton = null,
+  editorOpen = false,
 }: {
   sidebar: React.ReactNode;
   main: React.ReactNode;
-  filterIds?: number[];
-  /** The tags list is open in the main area. */
+  /** Tag filter and search; left out while the page is loading. */
+  listState?: ListState;
+  openId?: number | null;
+  /** The tags list is open. */
   showTags?: boolean;
+  /** The tags list, shown under the Tags button on small screens only. */
+  tagsBelowButton?: React.ReactNode;
+  /** A note is open: on small screens the main area moves above the notes. */
+  editorOpen?: boolean;
 }) {
+  const state = listState ?? noFilter;
   return (
     <>
-      <aside className="flex shrink-0 flex-col border-b bg-muted/40 md:w-72 md:border-b-0 md:border-r">
-        <div className="space-y-3 border-b p-4">
+      {/*
+        Small screens: <aside> is "display: contents", so its two parts (the
+        header and the notes list) and <main> are stacked by the page and can
+        be reordered with "order": header, then the open note's editor, then
+        the notes. Wide screens (md+): sidebar on the left, main on the right,
+        exactly as before.
+      */}
+      <aside className="contents md:flex md:w-72 md:shrink-0 md:flex-col md:border-r md:bg-muted/40">
+        <div className="order-1 space-y-3 border-b bg-muted/40 p-4 md:bg-transparent">
           <h1 className="text-lg font-semibold">Notes</h1>
-          <NewNoteButton filter={filterIds.join(",")} />
+          <SearchBox
+            q={state.q}
+            openId={openId}
+            tags={state.tags}
+            view={showTags ? "tags" : undefined}
+            disabled={!listState}
+          />
+          <NewNoteButton listState={state} />
           <NewCollectionButton />
-          {/* Opens the tags list in the main area; clicking again closes it. */}
+          {/* Opens the tags list (on the right; under this button on small
+              screens); clicking again closes it. */}
           <Link
-            href={showTags ? notesHref(null, filterIds) : notesHref(null, filterIds, "tags")}
+            href={showTags ? notesHref(state) : notesHref({ ...state, view: "tags" })}
             aria-current={showTags ? "page" : undefined}
             className={cn(buttonVariants({ variant: showTags ? "secondary" : "outline" }), "w-full")}
           >
             <Tags />
             Tags
           </Link>
+          {tagsBelowButton && <div className="pt-2 md:hidden">{tagsBelowButton}</div>}
         </div>
-        <div className="min-h-0 flex-1 p-2 md:overflow-y-auto">{sidebar}</div>
+        <div className="order-3 border-b bg-muted/40 p-2 md:min-h-0 md:flex-1 md:overflow-y-auto md:border-b-0 md:bg-transparent">
+          {sidebar}
+        </div>
       </aside>
-      <main className="flex min-h-[60dvh] min-w-0 flex-1 flex-col p-4 md:min-h-0 md:overflow-y-auto md:p-6">{main}</main>
+      <main
+        className={cn(
+          "flex min-h-[60dvh] min-w-0 flex-1 flex-col p-4 md:order-none md:min-h-0 md:overflow-y-auto md:border-b-0 md:p-6",
+          editorOpen ? "order-2 border-b" : "order-4",
+        )}
+      >
+        {main}
+      </main>
     </>
   );
 }
@@ -191,28 +263,36 @@ function Shell({
  */
 function TagFilter({
   tags,
-  selectedIds,
+  listState,
   openId,
   view,
 }: {
   tags: Tag[];
-  selectedIds: number[];
+  /** Current tag filter and search (the search is kept when tags change). */
+  listState: ListState;
   openId: number | null;
   /** Keep the tags list open while changing the filter. */
   view?: "tags";
 }) {
+  const selectedIds = listState.tags;
+  const href = (tagIds: number[]) =>
+    notesHref({ id: openId, tags: tagIds, q: listState.q, view });
   return (
     <section aria-labelledby="tag-filter-heading" className="px-2 pt-1">
       <div className="flex items-center justify-between gap-2">
-        <h2
-          id="tag-filter-heading"
-          className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-        >
-          Filter by tags
-        </h2>
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <h2
+            id="tag-filter-heading"
+            className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            Filter by tags
+          </h2>
+          {/* Hint: new tags are created from the note editor, not here. */}
+          <span className="text-[11px] text-muted-foreground">add new tag in the note</span>
+        </div>
         {selectedIds.length > 0 && (
           <Link
-            href={notesHref(openId, [], view)}
+            href={href([])}
             className="rounded text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
             Clear
@@ -233,7 +313,7 @@ function TagFilter({
             return (
               <li key={tag.id}>
                 <Link
-                  href={notesHref(openId, next, view)}
+                  href={href(next)}
                   title={on ? "Remove from filter" : "Add to filter"}
                   className={cn(
                     "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
@@ -263,20 +343,20 @@ function TagFilter({
 /**
  * One expandable group per collection (sorted by name), then "Uncollected"
  * for notes in no collection. Inside each group, notes stay newest-updated first.
- * While filtering by tags, groups with no matching notes are left out.
+ * While searching or filtering by tags, groups with no matching notes are left out.
  */
 function GroupedNotes({
   notes,
   collections,
   selectedId,
-  filterIds,
+  listState,
 }: {
   notes: NoteSummary[];
   collections: Collection[];
   selectedId: number | null;
-  filterIds: number[];
+  listState: ListState;
 }) {
-  const filtering = filterIds.length > 0;
+  const filtering = listState.tags.length > 0 || listState.q !== "";
   const byCollection = new Map<number, NoteSummary[]>(collections.map((c) => [c.id, []]));
   const uncollected: NoteSummary[] = [];
   for (const note of notes) {
@@ -300,7 +380,7 @@ function GroupedNotes({
             <GroupNotes
               notes={groupNotes}
               selectedId={selectedId}
-              filterIds={filterIds}
+              listState={listState}
               emptyText="No notes in this collection yet."
             />
           </NoteGroup>
@@ -311,8 +391,12 @@ function GroupedNotes({
           <GroupNotes
             notes={uncollected}
             selectedId={selectedId}
-            filterIds={filterIds}
-            emptyText="Every note is in a collection."
+            listState={listState}
+            emptyText={
+              notes.length === 0
+                ? "No notes yet. Click “New note” to write your first one."
+                : "Every note is in a collection."
+            }
           />
         </NoteGroup>
       )}
@@ -323,29 +407,29 @@ function GroupedNotes({
 function GroupNotes({
   notes,
   selectedId,
-  filterIds,
+  listState,
   emptyText,
 }: {
   notes: NoteSummary[];
   selectedId: number | null;
-  filterIds: number[];
+  listState: ListState;
   emptyText: string;
 }) {
   return notes.length === 0 ? (
     <Muted>{emptyText}</Muted>
   ) : (
-    <NoteList notes={notes} selectedId={selectedId} filterIds={filterIds} />
+    <NoteList notes={notes} selectedId={selectedId} listState={listState} />
   );
 }
 
 function NoteList({
   notes,
   selectedId,
-  filterIds,
+  listState,
 }: {
   notes: NoteSummary[];
   selectedId: number | null;
-  filterIds: number[];
+  listState: ListState;
 }) {
   return (
     <ul className="space-y-1">
@@ -360,7 +444,7 @@ function NoteList({
             )}
           >
             <Link
-              href={notesHref(note.id, filterIds)}
+              href={notesHref({ id: note.id, ...listState })}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-sm",
@@ -422,25 +506,6 @@ function Centered({ children }: { children: React.ReactNode }) {
 /** Title of the note that was just saved, if it is still in the list. */
 function savedTitle(notes: NoteSummary[] | null, savedId: number | null) {
   return notes?.find((n) => n.id === savedId)?.title ?? null;
-}
-
-/** "1,3" -> [1, 3]; anything that isn't an id is skipped. */
-function parseIdList(value: string | string[] | undefined): number[] {
-  const text = Array.isArray(value) ? value[0] : value;
-  const ids = (text ?? "")
-    .split(",")
-    .map(Number)
-    .filter((id) => Number.isInteger(id) && id > 0);
-  return [...new Set(ids)];
-}
-
-/** Link to /notes with an open note, a tag filter and/or the tags list. */
-function notesHref(id: number | null, tagIds: number[], view?: "tags") {
-  const parts: string[] = [];
-  if (id !== null) parts.push(`id=${id}`);
-  if (tagIds.length > 0) parts.push(`tags=${[...tagIds].sort((a, b) => a - b).join(",")}`);
-  if (view) parts.push(`view=${view}`);
-  return parts.length ? `/notes?${parts.join("&")}` : "/notes";
 }
 
 function parseId(value: string | string[] | undefined): number | null {
