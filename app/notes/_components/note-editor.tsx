@@ -6,7 +6,9 @@ import { startTransition, useActionState, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Collection, Note, Tag } from "@/lib/db";
+import { notesHref, type ListState } from "../list-state";
 import { CollectionPicker } from "./collection-picker";
+import { ListStateFields } from "./list-state-fields";
 import { TagEditor } from "./tag-editor";
 import {
   deleteNoteAction,
@@ -21,7 +23,7 @@ export function NoteEditor({
   note,
   collections,
   allTags,
-  filter,
+  listState,
   lastSavedLabel,
 }: {
   note: Note;
@@ -29,8 +31,8 @@ export function NoteEditor({
   collections: Collection[];
   /** Every tag, for suggestions in the tag box. */
   allTags: Tag[];
-  /** The sidebar's tag filter ("1,3" or ""), kept when the editor closes. */
-  filter: string;
+  /** The sidebar's tag filter and search, kept when the editor closes. */
+  listState: ListState;
   /** note.updated_at, already formatted on the server. */
   lastSavedLabel: string;
 }) {
@@ -88,12 +90,13 @@ export function NoteEditor({
       if (dirty && !window.confirm("Discard this new note?")) return;
       const formData = new FormData();
       formData.set("id", String(note.id));
-      formData.set("filter", filter);
+      formData.set("filter", listState.tags.join(","));
+      formData.set("q", listState.q);
       startTransition(() => discardAction(formData));
       return;
     }
     if (dirty && !window.confirm("Discard your unsaved changes?")) return;
-    router.push(filter ? `/notes?tags=${filter}` : "/notes");
+    router.push(notesHref(listState));
   }
 
   let status: { text: string; tone: "muted" | "error" } | null = null;
@@ -108,7 +111,7 @@ export function NoteEditor({
     <div className="flex min-h-0 flex-1 flex-col">
       <form action={saveAction} className="flex min-h-0 flex-1 flex-col gap-4">
         <input type="hidden" name="id" value={note.id} />
-        <input type="hidden" name="filter" value={filter} />
+        <ListStateFields state={listState} />
 
         <div className="flex flex-wrap items-center gap-3">
           <Input
@@ -177,7 +180,7 @@ export function NoteEditor({
         >
           <input type="hidden" name="id" value={note.id} />
           <input type="hidden" name="openId" value={note.id} />
-          <input type="hidden" name="filter" value={filter} />
+          <ListStateFields state={listState} />
           {deleteState.status === "error" && (
             <span role="alert" className="text-destructive">
               {deleteState.message}

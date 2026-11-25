@@ -5,6 +5,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { notesHref, parseSearch, parseTagIds, type ListState } from "./list-state";
 import {
   createCollection,
   createNote,
@@ -37,22 +38,14 @@ const MAX_TAG_NAME = 50;
 const MAX_TAGS_PER_NOTE = 20;
 
 /**
- * The sidebar's tag filter ("1,3"), sent along by forms as "filter" so a
- * redirect keeps it. Anything that isn't a list of ids is dropped.
+ * The sidebar's tag filter and search text, sent along by forms as hidden
+ * "filter" ("1,3") and "q" fields, so a redirect keeps them.
  */
-function readFilter(formData: FormData): string {
-  const filter = String(formData.get("filter") ?? "");
-  return /^\d+(,\d+)*$/.test(filter) ? filter : "";
-}
-
-/** /notes with the given query values (empty ones left out). */
-function notesUrl(params: { id?: number; saved?: number; filter: string }): string {
-  const query = new URLSearchParams();
-  if (params.id) query.set("id", String(params.id));
-  if (params.saved) query.set("saved", String(params.saved));
-  if (params.filter) query.set("tags", params.filter);
-  const text = query.toString().replaceAll("%2C", ",");
-  return text ? `/notes?${text}` : "/notes";
+function readListState(formData: FormData): ListState {
+  return {
+    tags: parseTagIds(formData.get("filter")),
+    q: parseSearch(formData.get("q")),
+  };
 }
 
 /** Trimmed collection name, or an error message if it can't be used. */
@@ -73,7 +66,7 @@ export async function createNoteAction(
   if (result.error !== null) {
     return { status: "error", message: `Could not create a note: ${result.error}` };
   }
-  redirect(notesUrl({ id: result.data.id, filter: readFilter(formData) }));
+  redirect(notesHref({ id: result.data.id, ...readListState(formData) }));
 }
 
 export async function saveNoteAction(
@@ -122,7 +115,7 @@ export async function saveNoteAction(
   }
 
   // Close the editor: go back to the list, with a "saved" confirmation.
-  redirect(notesUrl({ saved: id, filter: readFilter(formData) }));
+  redirect(notesHref({ saved: id, ...readListState(formData) }));
 }
 
 export async function deleteNoteAction(
@@ -143,7 +136,7 @@ export async function deleteNoteAction(
   // the editor; deleting any other note keeps the editor and its unsaved text.
   const openId = Number(formData.get("openId"));
   if (openId === id) {
-    redirect(notesUrl({ filter: readFilter(formData) }));
+    redirect(notesHref(readListState(formData)));
   }
   refresh();
   return { status: "idle" };
@@ -163,7 +156,7 @@ export async function discardNewNoteAction(
   if (result.error !== null) {
     return { status: "error", message: `Could not discard the new note: ${result.error}` };
   }
-  redirect(notesUrl({ filter: readFilter(formData) }));
+  redirect(notesHref(readListState(formData)));
 }
 
 /** "New collection" in the sidebar: adds a collection with the given name. */

@@ -20,15 +20,18 @@ const iconButton =
 export function TagManager({
   tags,
   closeHref,
+  headingId = "tags-heading",
 }: {
   tags: TagWithCount[];
   /** Where "Close" goes: the notes page, keeping the tag filter. */
   closeHref: string;
+  /** Unique heading id (the list can be on the page twice: small and wide screens). */
+  headingId?: string;
 }) {
   return (
-    <section aria-labelledby="tags-heading" className="mx-auto w-full max-w-xl">
+    <section aria-labelledby={headingId} className="mx-auto w-full max-w-xl">
       <div className="flex items-center justify-between gap-3">
-        <h2 id="tags-heading" className="text-lg font-semibold">
+        <h2 id={headingId} className="text-lg font-semibold">
           Tags
         </h2>
         <Link

@@ -37,10 +37,15 @@ export type Result<T> = { data: T; error: null } | { data: null; error: string }
 
 /**
  * Notes, most recently updated first, each with its tags.
- * With tagIds, only notes that have EVERY one of those tags are returned
- * (not notes that have any of them).
+ * - tagIds: only notes that have EVERY one of those tags (not any of them).
+ * - search: only notes whose title OR body contains the text, ignoring
+ *   upper/lower case. Combined with tagIds, it searches inside the notes
+ *   that have all those tags.
  */
-export async function getNotes(tagIds: number[] = []): Promise<Result<NoteSummary[]>> {
+export async function getNotes({
+  tagIds = [],
+  search = "",
+}: { tagIds?: number[]; search?: string } = {}): Promise<Result<NoteSummary[]>> {
   const supabase = await createClient();
 
   let onlyIds: number[] | null = null;
@@ -66,12 +71,21 @@ export async function getNotes(tagIds: number[] = []): Promise<Result<NoteSummar
     }
   }
 
+  const term = search.trim();
+
   // tags (id, name): PostgREST follows the note_tags join table to tags.
+  // The body is needed to double-check search matches below; it is not
+  // passed on to the sidebar.
   let query = supabase
     .from("notes")
-    .select("id, title, updated_at, collection_id, tags (id, name)");
+    .select("id, title, body, updated_at, collection_id, tags (id, name)");
   if (onlyIds !== null) {
     query = query.in("id", onlyIds);
+  }
+  if (term !== "") {
+    // title ILIKE '%term%' OR body ILIKE '%term%' (ILIKE = not case-sensitive).
+    const pattern = quoteFilterValue(`%${escapeLike(term)}%`);
+    query = query.or(`title.ilike.${pattern},body.ilike.${pattern}`);
   }
   const { data, error } = await query
     .order("updated_at", { ascending: false })
@@ -80,10 +94,42 @@ export async function getNotes(tagIds: number[] = []): Promise<Result<NoteSummar
   if (error) {
     return { data: null, error: error.message };
   }
+
+  // PostgREST also treats "*" in a pattern as a wildcard, so a search
+  // containing "*" could match too much: keep only real matches.
+  const needle = term.toLowerCase();
+  const matches =
+    term === ""
+      ? data
+      : data.filter(
+          (note) =>
+            note.title.toLowerCase().includes(needle) ||
+            (note.body ?? "").toLowerCase().includes(needle),
+        );
+
   return {
-    data: data.map((note) => ({ ...note, tags: sortTags(note.tags ?? []) })),
+    data: matches.map((note) => ({
+      id: note.id,
+      title: note.title,
+      updated_at: note.updated_at,
+      collection_id: note.collection_id,
+      tags: sortTags(note.tags ?? []),
+    })),
     error: null,
   };
+}
+
+/** Makes %, _ and \ in user text match literally in a LIKE/ILIKE pattern. */
+function escapeLike(text: string): string {
+  return text.replace(/[\\%_]/g, "\\$&");
+}
+
+/**
+ * Wraps a value in double quotes for a PostgREST filter such as .or(), so
+ * commas, dots, colons and brackets in user text are not read as syntax.
+ */
+function quoteFilterValue(value: string): string {
+  return `"${value.replace(/[\\"]/g, "\\$&")}"`;
 }
 
 /** One note by id, or null if there is no note with that id. */
