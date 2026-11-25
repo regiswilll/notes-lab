@@ -6,20 +6,39 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
 import {
+  createCollection,
   createNote,
   deleteNote,
+  deleteCollection,
   deleteNoteIfNeverSaved,
+  renameCollection,
   updateNote,
 } from "@/lib/db";
 
 export type ActionState = {
-  status: "idle" | "error";
+  status: "idle" | "success" | "error";
   message?: string;
 };
 
 function readId(formData: FormData): number | null {
   const id = Number(formData.get("id"));
-  return Number.isInteger(id) && id > 0 ? id : null;
+  return isId(id) ? id : null;
+}
+
+function isId(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+const MAX_COLLECTION_NAME = 100;
+
+/** Trimmed collection name, or an error message if it can't be used. */
+function readCollectionName(formData: FormData): { name: string } | { error: string } {
+  const name = String(formData.get("name") ?? "").trim();
+  if (name === "") return { error: "Give the collection a name." };
+  if (name.length > MAX_COLLECTION_NAME) {
+    return { error: `Keep the name to ${MAX_COLLECTION_NAME} characters or fewer.` };
+  }
+  return { name };
 }
 
 export async function createNoteAction(): Promise<ActionState> {
@@ -46,8 +65,14 @@ export async function saveNoteAction(
   if (title.trim() === "") {
     return { status: "error", message: "Give the note a title before saving." };
   }
+  // The collection dropdown: "" means "No collection".
+  const rawCollection = String(formData.get("collection_id") ?? "");
+  const collection_id = rawCollection === "" ? null : Number(rawCollection);
+  if (collection_id !== null && !isId(collection_id)) {
+    return { status: "error", message: "That is not a valid collection." };
+  }
 
-  const result = await updateNote(id, { title, body });
+  const result = await updateNote(id, { title, body, collection_id });
   if (result.error !== null) {
     return { status: "error", message: `Could not save: ${result.error}` };
   }
@@ -95,4 +120,62 @@ export async function discardNewNoteAction(
     return { status: "error", message: `Could not discard the new note: ${result.error}` };
   }
   redirect("/notes");
+}
+
+/** "New collection" in the sidebar: adds a collection with the given name. */
+export async function createCollectionAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const checked = readCollectionName(formData);
+  if ("error" in checked) {
+    return { status: "error", message: checked.error };
+  }
+
+  const result = await createCollection(checked.name);
+  if (result.error !== null) {
+    return { status: "error", message: `Could not add the collection: ${result.error}` };
+  }
+  refresh();
+  return { status: "success" };
+}
+
+/** "Save" in the edit-collection pop-up: renames the collection. */
+export async function renameCollectionAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const id = readId(formData);
+  if (id === null) {
+    return { status: "error", message: "This collection has no valid id." };
+  }
+  const checked = readCollectionName(formData);
+  if ("error" in checked) {
+    return { status: "error", message: checked.error };
+  }
+
+  const result = await renameCollection(id, checked.name);
+  if (result.error !== null) {
+    return { status: "error", message: `Could not rename the collection: ${result.error}` };
+  }
+  refresh();
+  return { status: "success" };
+}
+
+/** "Delete" in the edit-collection pop-up. Its notes become uncollected. */
+export async function deleteCollectionAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const id = readId(formData);
+  if (id === null) {
+    return { status: "error", message: "This collection has no valid id." };
+  }
+
+  const result = await deleteCollection(id);
+  if (result.error !== null) {
+    return { status: "error", message: `Could not delete the collection: ${result.error}` };
+  }
+  refresh();
+  return { status: "success" };
 }

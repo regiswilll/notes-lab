@@ -9,6 +9,14 @@ export type NoteSummary = {
   id: number;
   title: string;
   updated_at: string;
+  /** The collection this note is in, or null for no collection. */
+  collection_id: number | null;
+};
+
+/** A collection: a named group that holds notes. */
+export type Collection = {
+  id: number;
+  name: string;
 };
 
 /** A full note, for the editor. */
@@ -24,7 +32,7 @@ export async function getNotes(): Promise<Result<NoteSummary[]>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("notes")
-    .select("id, title, updated_at")
+    .select("id, title, updated_at, collection_id")
     .order("updated_at", { ascending: false })
     .order("id", { ascending: false });
 
@@ -39,7 +47,7 @@ export async function getNote(id: number): Promise<Result<Note | null>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("notes")
-    .select("id, title, body, created_at, updated_at")
+    .select("id, title, body, collection_id, created_at, updated_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -68,12 +76,13 @@ export async function createNote(): Promise<Result<{ id: number }>> {
 }
 
 /**
- * Saves a note's title and body. updated_at is set by the database trigger
- * notes_set_updated_at, so it is not sent from here.
+ * Saves a note's title, body and collection (null = no collection).
+ * updated_at is set by the database trigger notes_set_updated_at, so it is
+ * not sent from here.
  */
 export async function updateNote(
   id: number,
-  changes: { title: string; body: string },
+  changes: { title: string; body: string; collection_id: number | null },
 ): Promise<Result<null>> {
   const supabase = await createClient();
   // .select() returns the changed rows, so we can tell "saved" apart from
@@ -85,6 +94,10 @@ export async function updateNote(
     .select("id");
 
   if (error) {
+    // 23503 = foreign key violation: the chosen collection was deleted meanwhile.
+    if (error.code === "23503") {
+      return { data: null, error: "That collection no longer exists." };
+    }
     return { data: null, error: error.message };
   }
   if (data.length === 0) {
@@ -116,6 +129,71 @@ export async function deleteNoteIfNeverSaved(id: number): Promise<Result<null>> 
     .delete()
     .eq("id", id)
     .eq("title", "");
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data: null, error: null };
+}
+
+/** All collections, sorted by name. */
+export async function getCollections(): Promise<Result<Collection[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("collections")
+    .select("id, name")
+    .order("name", { ascending: true })
+    .order("id", { ascending: true });
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data, error: null };
+}
+
+/**
+ * Creates a collection and returns it. The database rejects a blank name
+ * (check constraint), so callers should trim and check the name first.
+ */
+export async function createCollection(name: string): Promise<Result<Collection>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("collections")
+    .insert({ name })
+    .select("id, name")
+    .single();
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data, error: null };
+}
+
+/** Renames a collection. */
+export async function renameCollection(id: number, name: string): Promise<Result<null>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("collections")
+    .update({ name })
+    .eq("id", id)
+    .select("id");
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  if (data.length === 0) {
+    return { data: null, error: "This collection no longer exists." };
+  }
+  return { data: null, error: null };
+}
+
+/**
+ * Deletes a collection. Its notes are kept: the database sets their
+ * collection_id to null (ON DELETE SET NULL), so they become uncollected.
+ */
+export async function deleteCollection(id: number): Promise<Result<null>> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("collections").delete().eq("id", id);
 
   if (error) {
     return { data: null, error: error.message };

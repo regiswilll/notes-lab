@@ -22,7 +22,11 @@ A personal notes app with collections, tags and search. It runs locally with `np
 
 ## Data access
 - Every database table read and write goes through ONE helper module: `lib/db.ts`. Components and pages never query tables with Supabase directly.
-- `lib/db.ts` currently has `getNotes()`, `getNote(id)`, `createNote()`, `updateNote(id, { title, body })`, `deleteNote(id)` and `deleteNoteIfNeverSaved(id)`. Each returns `{ data, error }`.
+- `lib/db.ts` currently has:
+  - Notes: `getNotes()`, `getNote(id)`, `createNote()`, `updateNote(id, { title, body, collection_id })`, `deleteNote(id)` and `deleteNoteIfNeverSaved(id)`
+  - Collections: `getCollections()`, `createCollection(name)`, `renameCollection(id, name)` and `deleteCollection(id)`
+
+  Each returns `{ data, error }`.
 - Client Components change data through Server Actions (e.g. `app/notes/actions.ts`), which call `lib/db.ts`.
 - `lib/db.ts` is server-only: it uses the server Supabase client and request cookies. Import it only from Server Components, Server Actions (`"use server"` files) and Route Handlers, never from a `"use client"` component.
 - Auth is not in `lib/db.ts` yet. These files still call Supabase auth directly, through the clients in `lib/supabase/`:
