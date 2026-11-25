@@ -13,6 +13,7 @@ import {
   type Tag,
 } from "@/lib/db";
 import { buttonVariants } from "@/components/ui/button";
+import { TAG_COLOR_CLASSES, tagPillClass } from "@/lib/tag-colors";
 import { cn } from "@/lib/utils";
 import { NewCollectionButton } from "./_components/new-collection-button";
 import { NewNoteButton } from "./_components/new-note-button";
@@ -316,10 +317,9 @@ function TagFilter({
                   href={href(next)}
                   title={on ? "Remove from filter" : "Add to filter"}
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                    on
-                      ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                    // The tag's colour: soft when not selected, strong when selected.
+                    on ? TAG_COLOR_CLASSES[tag.color].solid : TAG_COLOR_CLASSES[tag.color].soft,
                   )}
                 >
                   {on && <Check className="h-3 w-3" aria-hidden />}
@@ -468,7 +468,10 @@ function NoteList({
                   {note.tags.map((tag) => (
                     <span
                       key={tag.id}
-                      className="rounded-full bg-secondary px-2 py-px text-[11px] font-normal text-secondary-foreground"
+                      className={cn(
+                        "rounded-full px-2 py-px text-[11px] font-normal",
+                        tagPillClass(tag.color),
+                      )}
                     >
                       {tag.name}
                     </span>

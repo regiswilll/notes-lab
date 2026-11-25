@@ -18,7 +18,7 @@ automatically when a row is added.
   - The same tag can't be added to the same note twice.
   - If a note is deleted, its tag pairings are deleted too. The tags themselves stay.
   - If a tag is deleted, it is removed from every note. The notes themselves stay.
-- **Tags** have unique names: there can't be two tags called the same thing.
+- **Tags** have unique names: there can't be two tags called the same thing. Each tag has a colour from a fixed palette of 8.
 
 ```
 collections 1 ──< notes >── note_tags ──< tags
@@ -54,6 +54,7 @@ collections 1 ──< notes >── note_tags ──< tags
 |---|---|---|---|---|
 | `id` | `bigint` | no | identity | Primary key |
 | `name` | `text` | no | | Unique |
+| `color` | `text` | no | `'blue'` | Display colour. Must be one of `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink` (check `tags_color_check`). Added by migration `20261125091038_tags_color.sql`; the app's palette is in `lib/tag-colors.ts` |
 
 ### `note_tags`
 

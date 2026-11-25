@@ -1,11 +1,18 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { Check, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
 import type { TagWithCount } from "@/lib/db";
-import { deleteTagAction, renameTagAction, type ActionState } from "../actions";
+import { colorLabel, TAG_COLOR_CLASSES, TAG_COLORS, tagPillClass } from "@/lib/tag-colors";
+import { cn } from "@/lib/utils";
+import {
+  deleteTagAction,
+  renameTagAction,
+  setTagColorAction,
+  type ActionState,
+} from "../actions";
 
 const initialState: ActionState = { status: "idle" };
 
@@ -14,8 +21,8 @@ const iconButton =
 
 /**
  * The tags list, shown in the main area when "Tags" is clicked in the sidebar.
- * Each tag has an edit button (rename in place: Enter saves, Escape cancels)
- * and a delete button.
+ * Each tag has a colour button (pick from the palette; saved at once), an
+ * edit button (rename in place: Enter saves, Escape cancels) and a delete button.
  */
 export function TagManager({
   tags,
@@ -73,6 +80,15 @@ function TagRow({ tag }: { tag: TagWithCount }) {
     initialState,
   );
   const [deleteState, deleteAction, deleting] = useActionState(deleteTagAction, initialState);
+  const [picking, setPicking] = useState(false);
+  const [colorState, colorAction, coloring] = useActionState(
+    async (prev: ActionState, formData: FormData) => {
+      const result = await setTagColorAction(prev, formData);
+      if (result.status === "success") setPicking(false);
+      return result;
+    },
+    initialState,
+  );
 
   function startEditing() {
     setName(tag.name);
@@ -84,6 +100,7 @@ function TagRow({ tag }: { tag: TagWithCount }) {
   const error =
     (editing && renameState.status === "error" && renameState.message) ||
     (deleteState.status === "error" && deleteState.message) ||
+    (colorState.status === "error" && colorState.message) ||
     null;
 
   return (
@@ -110,7 +127,7 @@ function TagRow({ tag }: { tag: TagWithCount }) {
           </form>
         ) : (
           <span className="min-w-0 flex-1 truncate text-sm">
-            <span className="rounded-full bg-secondary px-2.5 py-0.5 text-secondary-foreground">
+            <span className={cn("rounded-full px-2.5 py-0.5", tagPillClass(tag.color))}>
               {tag.name}
             </span>
           </span>
@@ -119,6 +136,20 @@ function TagRow({ tag }: { tag: TagWithCount }) {
         <span className="shrink-0 text-xs text-muted-foreground">
           {editing ? (renaming ? "Saving…" : "Enter to save · Esc to cancel") : usedOn}
         </span>
+
+        {!editing && (
+          <button
+            type="button"
+            onClick={() => setPicking((p) => !p)}
+            aria-expanded={picking}
+            aria-controls={`tag-colors-${tag.id}`}
+            aria-label={`Colour of tag "${tag.name}": ${colorLabel(tag.color)}. Change colour`}
+            title="Change colour"
+            className={`${iconButton} hover:bg-accent`}
+          >
+            <span className={cn("h-4 w-4 rounded-full", TAG_COLOR_CLASSES[tag.color].swatch)} />
+          </button>
+        )}
 
         {!editing && (
           <button
@@ -158,6 +189,38 @@ function TagRow({ tag }: { tag: TagWithCount }) {
           </button>
         </form>
       </div>
+
+      {picking && !editing && (
+        // One submit button per colour: clicking a swatch saves it at once.
+        <form
+          id={`tag-colors-${tag.id}`}
+          action={colorAction}
+          className="mt-2 flex flex-wrap items-center gap-1.5"
+          aria-label={`Colours for tag "${tag.name}"`}
+        >
+          <input type="hidden" name="id" value={tag.id} />
+          {TAG_COLORS.map((color) => (
+            <button
+              key={color}
+              type="submit"
+              name="color"
+              value={color}
+              disabled={coloring}
+              aria-pressed={color === tag.color}
+              aria-label={colorLabel(color)}
+              title={colorLabel(color)}
+              className={cn(
+                "flex h-6 w-6 items-center justify-center rounded-full text-white ring-offset-2 ring-offset-background transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+                TAG_COLOR_CLASSES[color].swatch,
+                color === tag.color && "ring-2 ring-foreground",
+              )}
+            >
+              {color === tag.color && <Check className="h-3.5 w-3.5" aria-hidden />}
+            </button>
+          ))}
+          {coloring && <span className="text-xs text-muted-foreground">Saving…</span>}
+        </form>
+      )}
 
       {error && (
         <p role="alert" className="mt-1 text-xs text-destructive">
