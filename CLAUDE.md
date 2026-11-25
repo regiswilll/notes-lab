@@ -5,6 +5,8 @@
 ## What the app is
 A personal notes app with collections, tags and search. It runs locally with `npm run dev`.
 
+Every signed-in-only page must verify the user's session with the Supabase Auth server before it loads, and redirect to the sign-in page if the user is not signed in. Do not rely on the browser-side session alone.
+
 ## Stack
 - Next.js App Router
 - TypeScript
@@ -34,6 +36,7 @@ A personal notes app with collections, tags and search. It runs locally with `np
   - Client Components: `login-form`, `sign-up-form`, `forgot-password-form`, `update-password-form`, `logout-button` (in `components/`)
   - Server code: `components/auth-button.tsx`, `app/protected/page.tsx`, `app/auth/confirm/route.ts`
   - `proxy.ts` (via `lib/supabase/proxy.ts`) refreshes the session on each request, and sends logged-out visitors to the login page except on `/`, `/auth/*` and `/notes` (open for now, no login needed)
+  - `/workspace` is the signed-in area: sign-in and sign-up land there, and sign-out goes back to `/auth/login`. Every page under it calls `requireUser()` (`lib/supabase/require-user.ts`, which uses `getClaims()`) inside `<Suspense>`, so the server checks the user even though `proxy.ts` already redirects signed-out visitors. Never use `getSession()` for this on the server.
   Leave them as they are unless a task is about auth.
 
 ## Notes page (`app/notes/`)

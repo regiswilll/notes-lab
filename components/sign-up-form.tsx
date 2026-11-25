@@ -40,15 +40,18 @@ export function SignUpForm({
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/protected`,
+          // The confirmation link comes back through /auth/confirm, which
+          // starts the session and then sends the user to /workspace.
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=/workspace`,
         },
       });
       if (error) throw error;
-      router.push("/auth/sign-up-success");
+      // With email confirmation off, Supabase signs the user in straight away.
+      router.push(data.session ? "/workspace" : "/auth/sign-up-success");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -109,7 +112,7 @@ export function SignUpForm({
             <div className="mt-4 text-center text-sm">
               Already have an account?{" "}
               <Link href="/auth/login" className="underline underline-offset-4">
-                Login
+                Sign in
               </Link>
             </div>
           </form>
