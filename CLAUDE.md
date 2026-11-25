@@ -25,7 +25,7 @@ A personal notes app with collections, tags and search. It runs locally with `np
 - `lib/db.ts` currently has:
   - Notes: `getNotes({ tagIds, search })` (only notes with ALL the given tags; `search` matches title OR body, not case-sensitive), `getNote(id)`, `createNote()`, `updateNote(id, { title, body, collection_id })`, `deleteNote(id)` and `deleteNoteIfNeverSaved(id)`
   - Collections: `getCollections()`, `createCollection(name)`, `renameCollection(id, name)` and `deleteCollection(id)`
-  - Tags: `getTags()` (with each tag's note count), `setNoteTags(noteId, names)` (reuses or creates tags, then links/unlinks them in `note_tags`), `renameTag(id, name)` and `deleteTag(id)`
+  - Tags: `getTags()` (with each tag's note count), `setNoteTags(noteId, names)` (reuses or creates tags, then links/unlinks them in `note_tags`), `renameTag(id, name)`, `setTagColor(id, color)` and `deleteTag(id)`
 
   Each returns `{ data, error }`.
 - Client Components change data through Server Actions (e.g. `app/notes/actions.ts`), which call `lib/db.ts`.
@@ -66,6 +66,24 @@ A personal notes app with collections, tags and search. It runs locally with `np
   - Deleting a collection moves its notes to "Uncollected".
   - Deleting a tag removes it from its notes.
   - Neither deletes notes.
+- **Tag colours:**
+  - Each tag has one of 8 palette colours (`tags.color`).
+  - The palette and its Tailwind classes live in `lib/tag-colors.ts`. (The SQL comment in migration `20261125091038_tags_color.sql` says `app/notes/tag-colors.ts`; that path is wrong. Migration `20261125094658_tags_color_comment.sql` puts the right path in the column comment.)
+  - `lib/tag-colors.ts` is used by the browser too (the editor and the Tags list), so it must not import server-only code (`lib/db.ts`, `lib/supabase/server`, `next/headers`). Keep it to constants and pure functions.
+  - The 8 colour names are listed in 5 places, which must always match:
+    - `TAG_COLORS` in `lib/tag-colors.ts`
+    - the database check `tags_color_check`
+    - the comment on the `tags.color` column
+    - the `tags` table in `docs/supabase-schema.md`
+    - the backfill list in migration `20261125091038`, which has already run and is never edited
+  - To add, remove or rename a colour, change all of these together:
+    - Make a new migration (`npx supabase migration new <name>`). It drops and re-adds `tags_color_check` with the new list, and updates the column comment.
+    - Before removing or renaming a colour, the migration first moves tags that use it to a colour that stays.
+    - Update `TAG_COLORS` and the colour classes in `TAG_COLOR_CLASSES`, written out in full so Tailwind finds them.
+    - Update `docs/supabase-schema.md`.
+  - If the lists drift apart: a colour only in the app is rejected by the database, and a colour only in the database is shown as blue.
+  - New tags get the least-used colour. The colour can be changed in the Tags list.
+  - Colours show on note cards, in the tag filter (soft when not selected, strong when selected), in the editor chips and in the Tags list.
 - **Length limits:** collection name 100 characters, tag name 50, 20 tags per note, search 100.
 
 ## Workflow

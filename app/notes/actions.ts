@@ -5,6 +5,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { isTagColor } from "@/lib/tag-colors";
 import { notesHref, parseSearch, parseTagIds, type ListState } from "./list-state";
 import {
   createCollection,
@@ -16,6 +17,7 @@ import {
   renameCollection,
   renameTag,
   setNoteTags,
+  setTagColor,
   updateNote,
 } from "@/lib/db";
 
@@ -255,6 +257,28 @@ export async function deleteTagAction(
   const result = await deleteTag(id);
   if (result.error !== null) {
     return { status: "error", message: `Could not delete the tag: ${result.error}` };
+  }
+  refresh();
+  return { status: "success" };
+}
+
+/** A colour swatch in the tags list: changes the tag's colour everywhere. */
+export async function setTagColorAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const id = readId(formData);
+  if (id === null) {
+    return { status: "error", message: "This tag has no valid id." };
+  }
+  const color = formData.get("color");
+  if (!isTagColor(color)) {
+    return { status: "error", message: "That is not one of the tag colours." };
+  }
+
+  const result = await setTagColor(id, color);
+  if (result.error !== null) {
+    return { status: "error", message: `Could not change the colour: ${result.error}` };
   }
   refresh();
   return { status: "success" };

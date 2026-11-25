@@ -4,6 +4,8 @@ import { X } from "lucide-react";
 import { useState } from "react";
 
 import type { Tag } from "@/lib/db";
+import { tagPillClass } from "@/lib/tag-colors";
+import { cn } from "@/lib/utils";
 
 const MAX_TAG_NAME = 50;
 
@@ -57,6 +59,10 @@ export function TagEditor({
   }
 
   const suggestions = allTags.filter((t) => !has(t.name));
+  // A saved tag shows its colour; a tag that doesn't exist yet stays neutral
+  // until Save creates it (and gives it a colour).
+  const colorOf = (name: string) =>
+    allTags.find((t) => t.name.toLowerCase() === name.toLowerCase())?.color;
   const listId = `tag-suggestions-${noteId}`;
 
   return (
@@ -69,7 +75,10 @@ export function TagEditor({
         {value.map((name) => (
           <li
             key={name.toLowerCase()}
-            className="inline-flex items-center gap-1 rounded-full bg-secondary py-0.5 pl-2.5 pr-1 text-xs text-secondary-foreground"
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full py-0.5 pl-2.5 pr-1 text-xs",
+              tagPillClass(colorOf(name)),
+            )}
           >
             {name}
             <input type="hidden" name="tag" value={name} />
@@ -78,7 +87,7 @@ export function TagEditor({
               onClick={() => onChange(value.filter((t) => t !== name))}
               aria-label={`Remove tag "${name}"`}
               title="Remove tag"
-              className="flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="flex h-4 w-4 items-center justify-center rounded-full opacity-70 hover:bg-black/10 hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring dark:hover:bg-white/15"
             >
               <X className="h-3 w-3" />
             </button>

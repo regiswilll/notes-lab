@@ -3,11 +3,14 @@
 // directly. Server-only: it reads the request's cookies through the server
 // Supabase client, so never import it from a "use client" component.
 import { createClient } from "@/lib/supabase/server";
+import { isTagColor, pickColors, type TagColor } from "@/lib/tag-colors";
 
 /** A tag. Names are unique; the app also treats "Work" and "work" as the same tag. */
 export type Tag = {
   id: number;
   name: string;
+  /** One of the palette colours in lib/tag-colors.ts. */
+  color: TagColor;
 };
 
 /** What the sidebar needs for each note. */
@@ -78,7 +81,7 @@ export async function getNotes({
   // passed on to the sidebar.
   let query = supabase
     .from("notes")
-    .select("id, title, body, updated_at, collection_id, tags (id, name)");
+    .select("id, title, body, updated_at, collection_id, tags (id, name, color)");
   if (onlyIds !== null) {
     query = query.in("id", onlyIds);
   }
@@ -113,7 +116,7 @@ export async function getNotes({
       title: note.title,
       updated_at: note.updated_at,
       collection_id: note.collection_id,
-      tags: sortTags(note.tags ?? []),
+      tags: sortTags(toTags(note.tags)),
     })),
     error: null,
   };
@@ -137,7 +140,7 @@ export async function getNote(id: number): Promise<Result<Note | null>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("notes")
-    .select("id, title, body, collection_id, created_at, updated_at, tags (id, name)")
+    .select("id, title, body, collection_id, created_at, updated_at, tags (id, name, color)")
     .eq("id", id)
     .maybeSingle();
 
@@ -145,7 +148,7 @@ export async function getNote(id: number): Promise<Result<Note | null>> {
     return { data: null, error: error.message };
   }
   return {
-    data: data && { ...data, tags: sortTags(data.tags ?? []) },
+    data: data && { ...data, tags: sortTags(toTags(data.tags)) },
     error: null,
   };
 }
@@ -303,7 +306,7 @@ export async function getTags(): Promise<Result<TagWithCount[]>> {
   // note_tags(count): the number of note_tags rows for each tag.
   const { data, error } = await supabase
     .from("tags")
-    .select("id, name, note_tags(count)")
+    .select("id, name, color, note_tags(count)")
     .order("name", { ascending: true });
 
   if (error) {
@@ -312,6 +315,7 @@ export async function getTags(): Promise<Result<TagWithCount[]>> {
   const tags = data.map((tag) => ({
     id: tag.id as number,
     name: tag.name as string,
+    color: toColor(tag.color),
     noteCount: (tag.note_tags as { count: number }[] | null)?.[0]?.count ?? 0,
   }));
   return { data: sortTags(tags), error: null };
@@ -381,12 +385,15 @@ export async function setNoteTags(noteId: number, names: string[]): Promise<Resu
   }
 
   // 1. Find or create the tags.
-  const { data: existing, error: readError } = await supabase.from("tags").select("id, name");
+  const { data: existing, error: readError } = await supabase.from("tags").select("id, name, color");
   if (readError) {
     return { data: null, error: readError.message };
   }
   const byName = new Map(existing.map((tag) => [tag.name.toLowerCase(), tag.id]));
-  const missing = [...wanted].filter(([key]) => !byName.has(key)).map(([, name]) => ({ name }));
+  const missingNames = [...wanted].filter(([key]) => !byName.has(key)).map(([, name]) => name);
+  // New tags get the least-used palette colours, so colours stay varied.
+  const colors = pickColors(existing.map((tag) => toColor(tag.color)), missingNames.length);
+  const missing = missingNames.map((name, i) => ({ name, color: colors[i] }));
   if (missing.length > 0) {
     const { data: created, error } = await supabase.from("tags").insert(missing).select("id, name");
     if (error) {
@@ -431,6 +438,34 @@ export async function setNoteTags(noteId: number, names: string[]): Promise<Resu
     }
   }
   return { data: null, error: null };
+}
+
+/** Changes a tag's colour. */
+export async function setTagColor(id: number, color: TagColor): Promise<Result<null>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tags")
+    .update({ color })
+    .eq("id", id)
+    .select("id");
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  if (data.length === 0) {
+    return { data: null, error: "This tag no longer exists." };
+  }
+  return { data: null, error: null };
+}
+
+/** Embedded tags rows ({ id, name, color }) as Tag objects. */
+function toTags(rows: { id: number; name: string; color: unknown }[] | null): Tag[] {
+  return (rows ?? []).map((row) => ({ id: row.id, name: row.name, color: toColor(row.color) }));
+}
+
+/** The database only allows palette colours; fall back to blue just in case. */
+function toColor(value: unknown): TagColor {
+  return isTagColor(value) ? value : "blue";
 }
 
 function sortTags<T extends Tag>(tags: T[]): T[] {
