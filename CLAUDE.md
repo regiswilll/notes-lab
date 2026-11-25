@@ -23,8 +23,9 @@ A personal notes app with collections, tags and search. It runs locally with `np
 ## Data access
 - Every database table read and write goes through ONE helper module: `lib/db.ts`. Components and pages never query tables with Supabase directly.
 - `lib/db.ts` currently has:
-  - Notes: `getNotes()`, `getNote(id)`, `createNote()`, `updateNote(id, { title, body, collection_id })`, `deleteNote(id)` and `deleteNoteIfNeverSaved(id)`
+  - Notes: `getNotes(tagIds?)` (only notes with ALL the given tags), `getNote(id)`, `createNote()`, `updateNote(id, { title, body, collection_id })`, `deleteNote(id)` and `deleteNoteIfNeverSaved(id)`
   - Collections: `getCollections()`, `createCollection(name)`, `renameCollection(id, name)` and `deleteCollection(id)`
+  - Tags: `getTags()` (with each tag's note count), `setNoteTags(noteId, names)` (reuses or creates tags, then links/unlinks them in `note_tags`), `renameTag(id, name)` and `deleteTag(id)`
 
   Each returns `{ data, error }`.
 - Client Components change data through Server Actions (e.g. `app/notes/actions.ts`), which call `lib/db.ts`.
@@ -41,3 +42,4 @@ A personal notes app with collections, tags and search. It runs locally with `np
 
 ## UI
 - Whenever a list is empty, show a friendly message instead of a blank screen.
+- Note editor: ANY change in the editor (title, body, collection, tags, even text typed in the tag box) must enable the Save button, and Save must store it. Cancel discards it. Keep this for every field added later.
