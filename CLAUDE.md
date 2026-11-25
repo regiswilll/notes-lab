@@ -68,7 +68,7 @@ A personal notes app with collections, tags and search. It runs locally with `np
   - Neither deletes notes.
 - **Tag colours:**
   - Each tag has one of 8 palette colours (`tags.color`).
-  - The palette and its Tailwind classes live in `lib/tag-colors.ts`. (The comment in migration `20261125091038_tags_color.sql` says `app/notes/tag-colors.ts`; that path is wrong.)
+  - The palette and its Tailwind classes live in `lib/tag-colors.ts`. (The SQL comment in migration `20261125091038_tags_color.sql` says `app/notes/tag-colors.ts`; that path is wrong. Migration `20261125094658_tags_color_comment.sql` puts the right path in the column comment.)
   - `lib/tag-colors.ts` is used by the browser too (the editor and the Tags list), so it must not import server-only code (`lib/db.ts`, `lib/supabase/server`, `next/headers`). Keep it to constants and pure functions.
   - The 8 colour names are listed in 5 places, which must always match:
     - `TAG_COLORS` in `lib/tag-colors.ts`
