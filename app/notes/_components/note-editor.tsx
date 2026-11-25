@@ -5,7 +5,8 @@ import { startTransition, useActionState, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { Note } from "@/lib/db";
+import type { Collection, Note } from "@/lib/db";
+import { CollectionPicker } from "./collection-picker";
 import {
   deleteNoteAction,
   discardNewNoteAction,
@@ -17,15 +18,23 @@ const initialState: ActionState = { status: "idle" };
 
 export function NoteEditor({
   note,
+  collections,
   lastSavedLabel,
 }: {
   note: Note;
+  /** For the collection dropdown. */
+  collections: Collection[];
   /** note.updated_at, already formatted on the server. */
   lastSavedLabel: string;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(note.title);
   const [body, setBody] = useState(note.body ?? "");
+  const [collectionId, setCollectionId] = useState(note.collection_id);
+  // If the chosen collection is deleted meanwhile, fall back to "No collection".
+  const selectedCollection = collections.some((c) => c.id === collectionId)
+    ? collectionId
+    : null;
 
   const [saveState, saveAction, saving] = useActionState(
     saveNoteAction,
@@ -45,7 +54,10 @@ export function NoteEditor({
   const isNew = note.title.trim() === "";
 
   // Compare against the version loaded from the database.
-  const dirty = title !== note.title || body !== (note.body ?? "");
+  const dirty =
+    title !== note.title ||
+    body !== (note.body ?? "") ||
+    selectedCollection !== note.collection_id;
 
   // Warn before closing or reloading the tab with unsaved changes.
   useEffect(() => {
@@ -101,6 +113,13 @@ export function NoteEditor({
             {saving ? "Saving…" : "Save"}
           </Button>
         </div>
+
+        <CollectionPicker
+          noteId={note.id}
+          value={selectedCollection}
+          onChange={setCollectionId}
+          collections={collections}
+        />
 
         <textarea
           name="body"

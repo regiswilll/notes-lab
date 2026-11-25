@@ -2,11 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { getNote, getNotes, type NoteSummary } from "@/lib/db";
+import {
+  getCollections,
+  getNote,
+  getNotes,
+  type Collection,
+  type NoteSummary,
+} from "@/lib/db";
 import { cn } from "@/lib/utils";
-import { DeleteNoteButton } from "./_components/delete-note-button";
+import { NewCollectionButton } from "./_components/new-collection-button";
 import { NewNoteButton } from "./_components/new-note-button";
 import { NoteEditor } from "./_components/note-editor";
+import { NoteGroup } from "./_components/note-group";
 
 export const metadata: Metadata = { title: "Notes" };
 
@@ -32,8 +39,9 @@ async function NotesWorkspace({ searchParams }: { searchParams: SearchParams }) 
   const selectedId = parseId(params.id);
   const savedId = parseId(params.saved);
 
-  const [list, selected] = await Promise.all([
+  const [list, collections, selected] = await Promise.all([
     getNotes(),
+    getCollections(),
     selectedId === null ? null : getNote(selectedId),
   ]);
 
@@ -42,10 +50,16 @@ async function NotesWorkspace({ searchParams }: { searchParams: SearchParams }) 
       sidebar={
         list.error !== null ? (
           <ErrorText>Could not load notes: {list.error}</ErrorText>
-        ) : list.data.length === 0 ? (
+        ) : collections.error !== null ? (
+          <ErrorText>Could not load collections: {collections.error}</ErrorText>
+        ) : list.data.length === 0 && collections.data.length === 0 ? (
           <Muted>No notes yet. Click “New note” to write your first one.</Muted>
         ) : (
-          <NoteList notes={list.data} selectedId={selectedId} />
+          <GroupedNotes
+            notes={list.data}
+            collections={collections.data}
+            selectedId={selectedId}
+          />
         )
       }
       main={
@@ -75,6 +89,7 @@ async function NotesWorkspace({ searchParams }: { searchParams: SearchParams }) 
           <NoteEditor
             key={selected.data.id}
             note={selected.data}
+            collections={collections.data ?? []}
             lastSavedLabel={formatDate(selected.data.updated_at)}
           />
         )
@@ -90,11 +105,79 @@ function Shell({ sidebar, main }: { sidebar: React.ReactNode; main: React.ReactN
         <div className="space-y-3 border-b p-4">
           <h1 className="text-lg font-semibold">Notes</h1>
           <NewNoteButton />
+          <NewCollectionButton />
         </div>
         <div className="min-h-0 flex-1 p-2 md:overflow-y-auto">{sidebar}</div>
       </aside>
       <main className="flex min-h-[60dvh] min-w-0 flex-1 flex-col p-4 md:min-h-0 md:overflow-y-auto md:p-6">{main}</main>
     </>
+  );
+}
+
+/**
+ * One expandable group per collection (sorted by name), then "Uncollected"
+ * for notes in no collection. Inside each group, notes stay newest-updated first.
+ */
+function GroupedNotes({
+  notes,
+  collections,
+  selectedId,
+}: {
+  notes: NoteSummary[];
+  collections: Collection[];
+  selectedId: number | null;
+}) {
+  const byCollection = new Map<number, NoteSummary[]>(collections.map((c) => [c.id, []]));
+  const uncollected: NoteSummary[] = [];
+  for (const note of notes) {
+    const group = note.collection_id === null ? undefined : byCollection.get(note.collection_id);
+    if (group) group.push(note);
+    else uncollected.push(note);
+  }
+
+  return (
+    <div className="space-y-1">
+      {collections.map((collection) => {
+        const groupNotes = byCollection.get(collection.id) ?? [];
+        return (
+          <NoteGroup
+            key={collection.id}
+            collectionId={collection.id}
+            name={collection.name}
+            noteCount={groupNotes.length}
+          >
+            <GroupNotes
+              notes={groupNotes}
+              selectedId={selectedId}
+              emptyText="No notes in this collection yet."
+            />
+          </NoteGroup>
+        );
+      })}
+      <NoteGroup name="Uncollected" noteCount={uncollected.length}>
+        <GroupNotes
+          notes={uncollected}
+          selectedId={selectedId}
+          emptyText="Every note is in a collection."
+        />
+      </NoteGroup>
+    </div>
+  );
+}
+
+function GroupNotes({
+  notes,
+  selectedId,
+  emptyText,
+}: {
+  notes: NoteSummary[];
+  selectedId: number | null;
+  emptyText: string;
+}) {
+  return notes.length === 0 ? (
+    <Muted>{emptyText}</Muted>
+  ) : (
+    <NoteList notes={notes} selectedId={selectedId} />
   );
 }
 
@@ -107,7 +190,7 @@ function NoteList({ notes, selectedId }: { notes: NoteSummary[]; selectedId: num
           <li
             key={note.id}
             className={cn(
-              "flex flex-wrap items-center gap-1 rounded-md pr-1 transition-colors hover:bg-accent",
+              "flex items-center rounded-md transition-colors hover:bg-accent",
               active && "bg-accent",
             )}
           >
@@ -126,7 +209,6 @@ function NoteList({ notes, selectedId }: { notes: NoteSummary[]; selectedId: num
                 {formatDate(note.updated_at)}
               </span>
             </Link>
-            <DeleteNoteButton id={note.id} title={note.title} openId={selectedId} />
           </li>
         );
       })}
