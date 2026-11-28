@@ -2,10 +2,15 @@
 // here (or from Server Actions that import from here) and never call Supabase
 // directly. Server-only: it reads the request's cookies through the server
 // Supabase client, so never import it from a "use client" component.
+//
+// Every query runs as the signed-in user (the server client sends their
+// session), and Row Level Security limits it to that user's own rows. So
+// queries here never filter by user, and inserts never send user_id: the
+// database fills it in (default auth.uid()).
 import { createClient } from "@/lib/supabase/server";
 import { isTagColor, pickColors, type TagColor } from "@/lib/tag-colors";
 
-/** A tag. Names are unique; the app also treats "Work" and "work" as the same tag. */
+/** A tag. Names are unique per user; the app also treats "Work" and "work" as the same tag. */
 export type Tag = {
   id: number;
   name: string;
@@ -232,7 +237,7 @@ export async function deleteNoteIfNeverSaved(id: number): Promise<Result<null>> 
   return { data: null, error: null };
 }
 
-/** All collections, sorted by name. */
+/** The user's collections, sorted by name. */
 export async function getCollections(): Promise<Result<Collection[]>> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -300,7 +305,7 @@ export async function deleteCollection(id: number): Promise<Result<null>> {
 /** A tag with the number of notes it is on (for the tags list). */
 export type TagWithCount = Tag & { noteCount: number };
 
-/** All tags, sorted by name, each with how many notes have it. */
+/** The user's tags, sorted by name, each with how many notes have it. */
 export async function getTags(): Promise<Result<TagWithCount[]>> {
   const supabase = await createClient();
   // note_tags(count): the number of note_tags rows for each tag.
@@ -384,7 +389,7 @@ export async function setNoteTags(noteId: number, names: string[]): Promise<Resu
     if (!wanted.has(name.toLowerCase())) wanted.set(name.toLowerCase(), name);
   }
 
-  // 1. Find or create the tags.
+  // 1. Find or create the tags (RLS: only this user's tags are found).
   const { data: existing, error: readError } = await supabase.from("tags").select("id, name, color");
   if (readError) {
     return { data: null, error: readError.message };

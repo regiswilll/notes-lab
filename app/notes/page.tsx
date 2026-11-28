@@ -13,6 +13,7 @@ import {
   type Tag,
 } from "@/lib/db";
 import { buttonVariants } from "@/components/ui/button";
+import { requireUser } from "@/lib/supabase/require-user";
 import { TAG_COLOR_CLASSES, tagPillClass } from "@/lib/tag-colors";
 import { cn } from "@/lib/utils";
 import { NewCollectionButton } from "./_components/new-collection-button";
@@ -48,6 +49,9 @@ export default function NotesPage({ searchParams }: { searchParams: SearchParams
 }
 
 async function NotesWorkspace({ searchParams }: { searchParams: SearchParams }) {
+  // Signed-in only: checked on the server before any data is loaded. RLS then
+  // limits every query in lib/db.ts to this user's own rows.
+  await requireUser();
   const params = await searchParams;
   const selectedId = parseId(params.id);
   const savedId = parseId(params.saved);
