@@ -2,9 +2,15 @@
 
 // Server Actions for the notes page. They read form input, call lib/db.ts,
 // and refresh or redirect. They never talk to Supabase themselves.
+//
+// Server Actions can be called directly, not only from the page, so each one
+// first checks on the server that the user is signed in (requireUser sends
+// them to the sign-in page if not). RLS would reject the query anyway; this
+// gives a signed-out or expired session a clear path instead of an error.
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { requireUser } from "@/lib/supabase/require-user";
 import { isTagColor } from "@/lib/tag-colors";
 import { notesHref, parseSearch, parseTagIds, type ListState } from "./list-state";
 import {
@@ -64,6 +70,7 @@ export async function createNoteAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireUser();
   const result = await createNote();
   if (result.error !== null) {
     return { status: "error", message: `Could not create a note: ${result.error}` };
@@ -75,6 +82,7 @@ export async function saveNoteAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireUser();
   const id = readId(formData);
   if (id === null) {
     return { status: "error", message: "This note has no valid id." };
@@ -124,6 +132,7 @@ export async function deleteNoteAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireUser();
   const id = readId(formData);
   if (id === null) {
     return { status: "error", message: "This note has no valid id." };
@@ -149,6 +158,7 @@ export async function discardNewNoteAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireUser();
   const id = readId(formData);
   if (id === null) {
     return { status: "error", message: "This note has no valid id." };
@@ -166,6 +176,7 @@ export async function createCollectionAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireUser();
   const checked = readCollectionName(formData);
   if ("error" in checked) {
     return { status: "error", message: checked.error };
@@ -184,6 +195,7 @@ export async function renameCollectionAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireUser();
   const id = readId(formData);
   if (id === null) {
     return { status: "error", message: "This collection has no valid id." };
@@ -206,6 +218,7 @@ export async function deleteCollectionAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireUser();
   const id = readId(formData);
   if (id === null) {
     return { status: "error", message: "This collection has no valid id." };
@@ -224,6 +237,7 @@ export async function renameTagAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireUser();
   const id = readId(formData);
   if (id === null) {
     return { status: "error", message: "This tag has no valid id." };
@@ -249,6 +263,7 @@ export async function deleteTagAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireUser();
   const id = readId(formData);
   if (id === null) {
     return { status: "error", message: "This tag has no valid id." };
@@ -267,6 +282,7 @@ export async function setTagColorAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireUser();
   const id = readId(formData);
   if (id === null) {
     return { status: "error", message: "This tag has no valid id." };
