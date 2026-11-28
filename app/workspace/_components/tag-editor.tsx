@@ -108,7 +108,7 @@ export function TagEditor({
               onClick={() => onChange(value.filter((t) => t !== name))}
               aria-label={`Remove tag "${name}"`}
               title="Remove tag"
-              className="flex h-4 w-4 items-center justify-center rounded-full opacity-70 hover:bg-black/10 hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring dark:hover:bg-white/15"
+              className="flex h-4 w-4 items-center justify-center rounded-full opacity-70 hover:bg-black/10 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:hover:bg-white/15"
             >
               <X className="h-3 w-3" />
             </button>
@@ -178,19 +178,19 @@ export function TagEditor({
           aria-label="Add a tag"
           autoComplete="off"
           maxLength={MAX_TAG_NAME + 1}
-          className="h-8 w-36 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="h-9 w-40 px-2.5 rounded-md border border-input bg-transparent text-sm transition-colors placeholder:text-muted-foreground/70 hover:border-foreground/25 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         />
         <button
           type="button"
           onClick={add}
           disabled={draft.trim() === ""}
-          className="h-8 rounded-md border border-input px-2 text-xs shadow-sm hover:bg-accent disabled:opacity-50"
+          className="h-9 rounded-md border border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
         >
           Add
         </button>
 
         {showList && (
-          <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+          <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border bg-popover p-1 text-popover-foreground shadow-sm">
             <ul
               id={listId}
               role="listbox"

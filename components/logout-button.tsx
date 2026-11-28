@@ -15,5 +15,9 @@ export function LogoutButton() {
     window.location.assign("/auth/login");
   };
 
-  return <Button onClick={logout}>Sign out</Button>;
+  return (
+    <Button variant="outline" size="sm" onClick={logout}>
+      Sign out
+    </Button>
+  );
 }

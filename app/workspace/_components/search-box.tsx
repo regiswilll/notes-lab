@@ -56,7 +56,7 @@ export function SearchBox({
   return (
     <div className="relative">
       <Search
-        className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
         aria-hidden
       />
       <input
@@ -67,7 +67,7 @@ export function SearchBox({
         aria-label="Search notes by title or text"
         maxLength={MAX_SEARCH}
         disabled={disabled}
-        className="h-9 w-full rounded-md border border-input bg-background pl-8 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+        className="h-10 w-full bg-background pl-9 pr-3 rounded-md border border-input bg-transparent text-sm transition-colors placeholder:text-muted-foreground/70 hover:border-foreground/25 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-60"
       />
       <span role="status" className="sr-only">
         {searching ? "Searching…" : ""}

@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Brand } from "@/components/brand";
 import { Suspense } from "react";
 
 async function ErrorContent({
@@ -29,12 +30,13 @@ export default function Page({
   searchParams: Promise<{ error: string }>;
 }) {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+    <div className="flex min-h-svh w-full items-center justify-center px-4 py-10 md:p-10">
       <div className="w-full max-w-sm">
+        <Brand className="mb-8 justify-center" />
         <div className="flex flex-col gap-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-xl">
                 Sorry, something went wrong.
               </CardTitle>
             </CardHeader>

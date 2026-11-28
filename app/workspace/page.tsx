@@ -223,9 +223,10 @@ function Shell({
         the notes. Wide screens (md+): sidebar on the left, main on the right,
         exactly as before.
       */}
-      <aside className="contents md:flex md:w-72 md:shrink-0 md:flex-col md:border-r md:bg-muted/40">
-        <div className="order-1 space-y-3 border-b bg-muted/40 p-4 md:bg-transparent">
-          <h1 className="text-lg font-semibold">Notes</h1>
+      <aside className="contents md:flex md:w-80 md:shrink-0 md:flex-col md:border-r md:bg-muted">
+        <div className="order-1 space-y-2.5 border-b bg-muted p-4 md:bg-transparent">
+          {/* The app name is shown in the header; this heading is for screen readers. */}
+          <h1 className="sr-only">Notes</h1>
           <SearchBox
             q={state.q}
             openId={openId}
@@ -247,13 +248,13 @@ function Shell({
           </Link>
           {tagsBelowButton && <div className="pt-2 md:hidden">{tagsBelowButton}</div>}
         </div>
-        <div className="order-3 border-b bg-muted/40 p-2 md:min-h-0 md:flex-1 md:overflow-y-auto md:border-b-0 md:bg-transparent">
+        <div className="order-3 border-b bg-muted px-2 py-3 md:min-h-0 md:flex-1 md:overflow-y-auto md:border-b-0 md:bg-transparent">
           {sidebar}
         </div>
       </aside>
       <main
         className={cn(
-          "flex min-h-[60dvh] min-w-0 flex-1 flex-col p-4 md:order-none md:min-h-0 md:overflow-y-auto md:border-b-0 md:p-6",
+          "flex min-h-[60dvh] min-w-0 flex-1 flex-col px-4 py-6 md:order-none md:min-h-0 md:overflow-y-auto md:border-b-0 md:px-10 md:py-8",
           editorOpen ? "order-2 border-b" : "order-4",
         )}
       >
@@ -285,12 +286,12 @@ function TagFilter({
   const href = (tagIds: number[]) =>
     notesHref({ id: openId, tags: tagIds, q: listState.q, view });
   return (
-    <section aria-labelledby="tag-filter-heading" className="px-2 pt-1">
+    <section aria-labelledby="tag-filter-heading" className="px-2 pb-1">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
           <h2
             id="tag-filter-heading"
-            className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+            className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
           >
             Filter by tags
           </h2>
@@ -323,7 +324,7 @@ function TagFilter({
                   href={href(next)}
                   title={on ? "Remove from filter" : "Add to filter"}
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                    "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     // The tag's colour: soft when not selected, strong when selected.
                     on ? TAG_COLOR_CLASSES[tag.color].solid : TAG_COLOR_CLASSES[tag.color].soft,
                   )}
@@ -445,15 +446,16 @@ function NoteList({
           <li
             key={note.id}
             className={cn(
-              "flex items-center rounded-md transition-colors hover:bg-accent",
-              active && "bg-accent",
+              "flex items-center rounded-lg border border-transparent transition-colors hover:bg-accent/70",
+              // The open note: a raised card with a thin accent bar on the left.
+              active && "border-border bg-background shadow-[inset_2px_0_0_hsl(var(--primary))] hover:bg-background",
             )}
           >
             <Link
               href={notesHref({ id: note.id, ...listState })}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-sm",
+                "flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 active && "font-medium",
               )}
             >
@@ -461,7 +463,7 @@ function NoteList({
                 <span className={cn("block truncate", !note.title.trim() && "italic text-muted-foreground")}>
                   {note.title.trim() || "No title yet"}
                 </span>
-                <span className="block truncate text-xs text-muted-foreground">
+                <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
                   {formatDate(note.updated_at)}
                 </span>
               </span>
@@ -493,7 +495,7 @@ function NoteList({
 }
 
 function Muted({ children }: { children: React.ReactNode }) {
-  return <p className="px-3 py-2 text-sm text-muted-foreground">{children}</p>;
+  return <p className="px-3 py-2 text-sm leading-relaxed text-muted-foreground">{children}</p>;
 }
 
 function ErrorText({ children }: { children: React.ReactNode }) {
@@ -506,7 +508,7 @@ function ErrorText({ children }: { children: React.ReactNode }) {
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center text-center text-sm text-muted-foreground">
+    <div className="mx-auto flex max-w-sm flex-1 flex-col items-center justify-center text-center text-sm leading-relaxed text-muted-foreground">
       {children}
     </div>
   );

@@ -74,9 +74,9 @@ export function EditCollectionDialog({
         if (e.target === e.currentTarget && !busy) close();
       }}
       aria-labelledby={`edit-collection-${id}`}
-      className="w-[calc(100%-2rem)] max-w-sm rounded-lg border bg-background p-0 text-foreground shadow-lg backdrop:bg-black/60"
+      className="w-[calc(100%-2rem)] max-w-sm rounded-xl border bg-background p-0 text-foreground shadow-lg shadow-black/10 backdrop:bg-black/50 backdrop:backdrop-blur-[2px]"
     >
-      <form action={renameAction} className="space-y-4 p-5">
+      <form action={renameAction} className="space-y-5 p-6">
         <h2 id={`edit-collection-${id}`} className="text-base font-semibold">
           Edit collection
         </h2>

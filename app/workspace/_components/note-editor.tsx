@@ -109,7 +109,7 @@ export function NoteEditor({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <form action={saveAction} className="flex min-h-0 flex-1 flex-col gap-4">
+      <form action={saveAction} className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-5">
         <input type="hidden" name="id" value={note.id} />
         <ListStateFields state={listState} />
 
@@ -122,7 +122,7 @@ export function NoteEditor({
             aria-label="Title"
             required
             autoFocus={note.title === ""}
-            className="h-11 min-w-0 flex-1 text-lg font-semibold md:text-lg"
+            className="h-12 min-w-0 flex-1 border-transparent bg-transparent px-2 text-2xl font-semibold tracking-tight placeholder:font-normal hover:border-input md:text-2xl"
           />
           <Button type="button" variant="outline" onClick={cancel} disabled={saving || discarding}>
             {discarding ? "Discarding…" : "Cancel"}
@@ -154,11 +154,11 @@ export function NoteEditor({
           onChange={(e) => setBody(e.target.value)}
           placeholder="Start writing…"
           aria-label="Body"
-          className="min-h-64 flex-1 resize-none rounded-md border border-input bg-transparent p-3 text-sm leading-relaxed shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="min-h-64 flex-1 resize-none rounded-lg border border-input bg-transparent px-4 py-3 text-base leading-7 transition-colors placeholder:text-muted-foreground/70 hover:border-foreground/25 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         />
       </form>
 
-      <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+      <div className="mx-auto mt-4 flex w-full max-w-3xl items-center justify-between gap-3 border-t pt-3 text-xs text-muted-foreground">
         <p
           role="status"
           className={status?.tone === "error" ? "text-destructive" : undefined}
