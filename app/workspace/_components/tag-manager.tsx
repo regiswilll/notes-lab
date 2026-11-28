@@ -17,7 +17,7 @@ import {
 const initialState: ActionState = { status: "idle" };
 
 const iconButton =
-  "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50";
+  "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 
 /**
  * The tags list, shown in the main area when "Tags" is clicked in the sidebar.
@@ -38,12 +38,12 @@ export function TagManager({
   return (
     <section aria-labelledby={headingId} className="mx-auto w-full max-w-xl">
       <div className="flex items-center justify-between gap-3">
-        <h2 id={headingId} className="text-lg font-semibold">
+        <h2 id={headingId} className="text-xl font-semibold tracking-tight">
           Tags
         </h2>
         <Link
           href={closeHref}
-          className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Close
         </Link>
@@ -57,7 +57,7 @@ export function TagManager({
           No tags yet. Add tags to a note in the editor.
         </p>
       ) : (
-        <ul className="mt-4 divide-y rounded-md border">
+        <ul className="mt-6 divide-y rounded-lg border">
           {tags.map((tag) => (
             <TagRow key={tag.id} tag={tag} />
           ))}
@@ -104,7 +104,7 @@ function TagRow({ tag }: { tag: TagWithCount }) {
     null;
 
   return (
-    <li className="px-3 py-2">
+    <li className="px-4 py-3">
       <div className="flex items-center gap-2">
         {editing ? (
           // A form with one text box: pressing Enter submits it.
@@ -122,7 +122,7 @@ function TagRow({ tag }: { tag: TagWithCount }) {
               maxLength={50}
               autoFocus
               disabled={renaming}
-              className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="h-8 w-full px-2 rounded-md border border-input bg-transparent text-sm transition-colors placeholder:text-muted-foreground/70 hover:border-foreground/25 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
             />
           </form>
         ) : (

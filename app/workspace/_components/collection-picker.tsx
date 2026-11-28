@@ -29,7 +29,7 @@ export function CollectionPicker({
         name="collection_id"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-        className="h-9 min-w-0 max-w-full rounded-md border border-input bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="h-9 min-w-0 max-w-full bg-background px-2.5 rounded-md border border-input bg-transparent text-sm transition-colors placeholder:text-muted-foreground/70 hover:border-foreground/25 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
       >
         <option value="">No collection</option>
         {collections.map((c) => (

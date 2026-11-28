@@ -1,3 +1,4 @@
+import { Brand } from "@/components/brand";
 import {
   Card,
   CardContent,
@@ -8,12 +9,13 @@ import {
 
 export default function Page() {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+    <div className="flex min-h-svh w-full items-center justify-center px-4 py-10 md:p-10">
       <div className="w-full max-w-sm">
+        <Brand className="mb-8 justify-center" />
         <div className="flex flex-col gap-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-xl">
                 Thank you for signing up!
               </CardTitle>
               <CardDescription>Check your email to confirm</CardDescription>

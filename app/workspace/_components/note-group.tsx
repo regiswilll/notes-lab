@@ -45,9 +45,9 @@ export function NoteGroup({
     </span>
   );
   const rowClass =
-    "flex items-center rounded-md text-sm font-semibold [&_svg]:size-4 [&_svg]:shrink-0";
+    "flex items-center rounded-md text-sm font-medium text-foreground/90 [&_svg]:size-4 [&_svg]:shrink-0";
   const focusRing =
-    "rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+    "rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
   return (
     <div>
@@ -81,7 +81,7 @@ export function NoteGroup({
         </div>
       )}
 
-      <div id={contentId} hidden={!open} className="pb-2 pl-4 pt-1">
+      <div id={contentId} hidden={!open} className="mb-2 ml-[1.0625rem] mt-1 border-l pl-2">
         {children}
       </div>
 

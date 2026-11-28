@@ -1,5 +1,5 @@
 import { AuthButton } from "@/components/auth-button";
-import Link from "next/link";
+import { Brand } from "@/components/brand";
 import { Suspense } from "react";
 
 // The header (the user's e-mail and Sign out) is shared by every page under
@@ -14,11 +14,9 @@ export default function WorkspaceLayout({
     // Narrow screens: the page grows and scrolls as a whole. From md up: exactly
     // the screen height, so the notes columns can scroll on their own.
     <div className="flex min-h-dvh flex-col md:h-dvh">
-      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b px-4 text-sm">
-        <Link href="/workspace" className="font-semibold">
-          Notes
-        </Link>
-        <Suspense fallback={<span className="text-muted-foreground">Loading…</span>}>
+      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-background px-4 md:px-6">
+        <Brand href="/workspace" className="shrink-0" />
+        <Suspense fallback={<span className="text-sm text-muted-foreground">Loading…</span>}>
           <AuthButton />
         </Suspense>
       </header>
