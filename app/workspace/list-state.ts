@@ -1,5 +1,5 @@
 // What the sidebar list is narrowed to: the tag filter and the search text.
-// Both live in the URL (/notes?tags=1,3&q=plan), so a reload keeps them, and
+// Both live in the URL (/workspace?tags=1,3&q=plan), so a reload keeps them, and
 // forms send them along (hidden "filter" and "q" fields) so a redirect after
 // Save, Delete, New note or Cancel keeps them too.
 // Shared by the page, the Server Actions and the client components.
@@ -13,7 +13,7 @@ export type ListState = {
 
 export const MAX_SEARCH = 100;
 
-/** /notes with an open note, a "saved" message, the tags list, and the list state. */
+/** /workspace with an open note, a "saved" message, the tags list, and the list state. */
 export function notesHref(
   options: { id?: number | null; saved?: number | null; view?: "tags" } & Partial<ListState>,
 ): string {
@@ -25,7 +25,7 @@ export function notesHref(
   }
   if (options.q) parts.push(`q=${encodeURIComponent(options.q)}`);
   if (options.view) parts.push(`view=${options.view}`);
-  return parts.length ? `/notes?${parts.join("&")}` : "/notes";
+  return parts.length ? `/workspace?${parts.join("&")}` : "/workspace";
 }
 
 /** "1,3" -> [1, 3]; anything that isn't an id is skipped. */

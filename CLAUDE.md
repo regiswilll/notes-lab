@@ -37,18 +37,19 @@ Every signed-in-only page must verify the user's session with the Supabase Auth 
   - Tags: `getTags()` (with each tag's note count), `setNoteTags(noteId, names)` (reuses or creates tags, then links/unlinks them in `note_tags`), `renameTag(id, name)`, `setTagColor(id, color)` and `deleteTag(id)`
 
   Each returns `{ data, error }`.
-- Client Components change data through Server Actions (e.g. `app/notes/actions.ts`), which call `lib/db.ts`.
+- Client Components change data through Server Actions (e.g. `app/workspace/actions.ts`), which call `lib/db.ts`.
 - `lib/db.ts` is server-only: it uses the server Supabase client and request cookies. Import it only from Server Components, Server Actions (`"use server"` files) and Route Handlers, never from a `"use client"` component.
 - Auth is not in `lib/db.ts` yet. These files still call Supabase auth directly, through the clients in `lib/supabase/`:
   - Client Components: `login-form`, `sign-up-form`, `forgot-password-form`, `update-password-form`, `logout-button` (in `components/`)
   - Server code: `components/auth-button.tsx`, `app/protected/page.tsx`, `app/auth/confirm/route.ts`
   - `proxy.ts` (via `lib/supabase/proxy.ts`) refreshes the session on each request, and sends logged-out visitors to the login page except on `/` and `/auth/*`
-  - `/notes` is signed-in only: `app/notes/page.tsx` and every Server Action in `app/notes/actions.ts` call `requireUser()` first
-  - `/workspace` is the signed-in area: sign-in and sign-up land there, and sign-out goes back to `/auth/login`. Every page under it calls `requireUser()` (`lib/supabase/require-user.ts`, which uses `getClaims()`) inside `<Suspense>`, so the server checks the user even though `proxy.ts` already redirects signed-out visitors. Never use `getSession()` for this on the server.
+  - `/` is only a landing page: on the server it sends signed-in users to `/workspace` and everyone else to `/auth/login`.
+  - `/workspace` is the notes app, signed-in only: sign-in and sign-up land there, and sign-out goes back to `/auth/login`. Every page under it calls `requireUser()` (`lib/supabase/require-user.ts`, which uses `getClaims()`) inside `<Suspense>` before rendering, and so does every Server Action in `app/workspace/actions.ts`. This is the real check; `proxy.ts` redirecting signed-out visitors is only a first layer, and the layout is not a check (it isn't re-run on every navigation). Never use `getSession()` for this on the server.
+  - `/notes` (the old address) redirects to `/workspace`, keeping the query (`next.config.ts`).
   Leave them as they are unless a task is about auth.
 
-## Notes page (`app/notes/`)
-- `page.tsx` is a Server Component: it reads the URL, loads data through `lib/db.ts` and renders the sidebar and the main area. Client pieces live in `app/notes/_components/`; data changes go through `app/notes/actions.ts`.
+## Notes app (`app/workspace/`)
+- `page.tsx` is a Server Component: it reads the URL, loads data through `lib/db.ts` and renders the sidebar and the main area. `layout.tsx` adds the header (the user's e-mail and Sign out). Client pieces live in `app/workspace/_components/`; data changes go through `app/workspace/actions.ts`.
 - `cacheComponents` is on (`next.config.ts`): request-time data (URL search params, cookies, database reads) is read inside `<Suspense>`.
 - Page state lives in the URL, so a reload keeps it:
   - `?id=5`: the open note
@@ -56,7 +57,7 @@ Every signed-in-only page must verify the user's session with the Supabase Auth 
   - `?tags=1,3`: the tag filter
   - `?q=text`: the search
   - `?view=tags`: the tags list
-- Build these URLs with `notesHref()` from `app/notes/list-state.ts`. Forms send the tag filter and search as hidden fields (`ListStateFields`), so Server Action redirects keep them.
+- Build these URLs with `notesHref()` from `app/workspace/list-state.ts`. Forms send the tag filter and search as hidden fields (`ListStateFields`), so Server Action redirects keep them.
 - Sidebar layout, top to bottom:
   - The search box
   - The New note, New collection and Tags buttons
