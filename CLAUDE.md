@@ -22,6 +22,13 @@ Every signed-in-only page must verify the user's session with the Supabase Auth 
 - Credentials come only from `.env.local`: `NEXT_PUBLIC_SUPABASE_URL` and the publishable/anon key.
 - Never hard-code them.
 
+## Auth & per-user data rules
+- Every table holding user data (notes, collections, tags, note_tags) has a user_id column (uuid, references auth.users, default auth.uid()) and RLS enabled.
+- All schema changes are made as migration files in supabase/migrations and applied with the Supabase CLI (supabase db push). Never edit the schema by hand in the dashboard.
+- All data access still goes through app/lib/db.ts, using the @supabase/ssr client so requests carry the signed-in user's session.
+- Never store user data in localStorage or sessionStorage.
+- Every page under /workspace checks the user on the server and redirects to the sign-in page if there is no user.
+
 ## Data access
 - Every database table read and write goes through ONE helper module: `lib/db.ts`. Components and pages never query tables with Supabase directly.
 - `lib/db.ts` currently has:
