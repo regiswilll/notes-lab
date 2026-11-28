@@ -41,7 +41,7 @@ Every signed-in-only page must verify the user's session with the Supabase Auth 
 - `lib/db.ts` is server-only: it uses the server Supabase client and request cookies. Import it only from Server Components, Server Actions (`"use server"` files) and Route Handlers, never from a `"use client"` component.
 - Auth is not in `lib/db.ts` yet. These files still call Supabase auth directly, through the clients in `lib/supabase/`:
   - Client Components: `login-form`, `sign-up-form`, `forgot-password-form`, `update-password-form`, `logout-button` (in `components/`)
-  - Server code: `components/auth-button.tsx`, `app/protected/page.tsx`, `app/auth/confirm/route.ts`
+  - Server code: `components/auth-button.tsx`, `app/auth/confirm/route.ts`
   - `proxy.ts` (via `lib/supabase/proxy.ts`) refreshes the session on each request, and sends logged-out visitors to the login page except on `/` and `/auth/*`
   - `/` is only a landing page: on the server it sends signed-in users to `/workspace` and everyone else to `/auth/login`.
   - `/workspace` is the notes app, signed-in only: sign-in and sign-up land there, and sign-out goes back to `/auth/login`. Every page under it calls `requireUser()` (`lib/supabase/require-user.ts`, which uses `getClaims()`) inside `<Suspense>` before rendering, and so does every Server Action in `app/workspace/actions.ts`. This is the real check; `proxy.ts` redirecting signed-out visitors is only a first layer, and the layout is not a check (it isn't re-run on every navigation). Never use `getSession()` for this on the server.
